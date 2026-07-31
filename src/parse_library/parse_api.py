@@ -5,6 +5,9 @@ Each output line is one JSON object: {"name": "<qualified.name>", "kind": "<modu
 
 import inspect
 import json
+from pathlib import Path
+
+DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 
 
 def is_public(name):
@@ -73,7 +76,8 @@ def main():
 
     # setting output file name
     version = root.__version__
-    output_file = f"pycolmap_{version}_api.jsonl"
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    output_file = DATA_DIR / f"pycolmap_{version}_api.jsonl"
 
     records = collect_apis(root, parsed_module_name)
 
