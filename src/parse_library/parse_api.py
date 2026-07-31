@@ -68,13 +68,15 @@ def write_jsonl(records, output_path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Extract all API names from a Python library into a JSONL file.")
-    parser.add_argument("module", nargs="?", default="pycolmap", help="Importable module name (default: pycolmap)")
-    parser.add_argument("-o", "--output", default="pycolmap_apis.jsonl", help="Output JSONL path")
-    args = parser.parse_args()
+    # setting parsed module & import 
+    parsed_module_name = "pycolmap"
+    root = __import__(parsed_module_name)
 
-    root = __import__(args.module)
-    records = collect_apis(root, args.module)
+    # setting output file name
+    version = root.__version__
+    output_file = f"pycolmap_{version}_api.jsonl"
+
+    records = collect_apis(root, parsed_module_name)
 
     seen = set()
     unique_records = []
@@ -85,8 +87,8 @@ def main():
         unique_records.append(record)
     unique_records.sort(key=lambda r: r["name"])
 
-    write_jsonl(unique_records, args.output)
-    print(f"Wrote {len(unique_records)} API entries to {args.output}")
+    write_jsonl(unique_records, output_file)
+    print(f"Wrote {len(unique_records)} API entries to {output_file}")
 
 
 if __name__ == "__main__":
