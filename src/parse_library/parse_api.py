@@ -3,7 +3,6 @@
 Each output line is one JSON object: {"name": "<qualified.name>", "kind": "<module|class|function|method|property|attribute>"}
 """
 
-import argparse
 import inspect
 import json
 
