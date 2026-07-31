@@ -26,9 +26,15 @@ def classify(owner, member):
     return "attribute"
 
 
-def walk(obj, prefix, visited, results, max_depth=6, depth=0):
-    if depth > max_depth:
-        return
+def belongs_to_package(member, kind, root_name):
+    if kind == "module":
+        owner_name = getattr(member, "__name__", "")
+    else:
+        owner_name = getattr(member, "__module__", "") or ""
+    return owner_name == root_name or owner_name.startswith(root_name + ".")
+
+
+def walk(obj, prefix, root_name, visited, results, depth=0):
     for name in sorted(dir(obj)):
         if not is_public(name):
             continue
@@ -41,17 +47,17 @@ def walk(obj, prefix, visited, results, max_depth=6, depth=0):
         kind = classify(obj, member)
         results.append({"name": qualified_name, "kind": kind})
 
-        if kind in ("module", "class"):
+        if kind in ("module", "class") and belongs_to_package(member, kind, root_name):
             member_id = id(member)
             if member_id in visited:
                 continue
             visited.add(member_id)
-            walk(member, qualified_name, visited, results, max_depth, depth + 1)
+            walk(member, qualified_name, root_name, visited, results, depth + 1)
 
 
 def collect_apis(root, root_name):
     results = [{"name": root_name, "kind": "module"}]
-    walk(root, root_name, {id(root)}, results)
+    walk(root, root_name, root_name, {id(root)}, results)
     return results
 
 
