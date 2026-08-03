@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from parse_config import api_jsonl_path
+from config import api_jsonl_path
 
 OVERLOAD_LINE_RE = re.compile(r"^\d+\.\s+(.+)$")
 IMPLICIT_PARAM_NAMES = {"self", "cls"}

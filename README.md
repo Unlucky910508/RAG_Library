@@ -30,7 +30,7 @@ directly, e.g. `/path/to/envs/pycolmap/bin/python`).
 
 ## 2. LLM config (only needed for step 3, `parse_explanations.py`)
 
-- Edit `config/parse_config.py`:
+- Edit `config/config.py`:
   - `LLM_BASE_URL` — your local OpenAI-compatible server, e.g. `http://localhost:8000/v1`
   - `LLM_MODEL` — the model name your server expects
 - Create `config/key.txt` containing your API key on a single line.
@@ -79,7 +79,7 @@ a chunk suited to that style. Writes `data/pycolmap_{version}_chunks.jsonl`.
 Chunks only carry `record_id`/`chunk_type`/`text`; the full record is looked
 up by `record_id` in the API jsonl once a chunk matches, not duplicated
 here. Which fields compose each chunk_type is a declarative recipe
-(`CHUNK_FIELDS` in `config/parse_config.py`), not code — new chunk types
+(`CHUNK_FIELDS` in `config/config.py`), not code — new chunk types
 built from existing fields need only a config edit.
 
 Embedding the chunk text into vectors and loading them into a vector DB is
@@ -92,7 +92,7 @@ as a module (`-m`) — there is no `__init__.py` under `src/`.
 ## 4. Notes
 
 - Target library name / output path / LLM settings are centralized in
-  `config/parse_config.py` so the three scripts never drift out of sync.
+  `config/config.py` so the three scripts never drift out of sync.
 - Known gaps and open issues are tracked locally in `KNOWN_ISSUES.md`
   (gitignored, not part of this repo's public history).
 

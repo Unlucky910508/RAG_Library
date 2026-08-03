@@ -9,7 +9,7 @@ API jsonl and is looked up by record_id after a chunk matches, so nothing
 is duplicated here.
 
 Which fields make up which chunk_type is a data-only recipe
-(CHUNK_FIELDS in config/parse_config.py), not code: FIELD_EXTRACTORS below
+(CHUNK_FIELDS in config/config.py), not code: FIELD_EXTRACTORS below
 is the one-function-per-JSON-field vocabulary the recipe draws from, and
 build_chunk_text() just looks up and concatenates whichever ones a given
 chunk_type lists. Adding or reshaping a chunk_type out of existing fields
@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from parse_config import CHUNK_FIELDS, api_jsonl_path, chunks_jsonl_path
+from config import CHUNK_FIELDS, api_jsonl_path, chunks_jsonl_path
 
 
 def read_jsonl(path):

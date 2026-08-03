@@ -15,7 +15,7 @@ from pathlib import Path
 import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from parse_config import LLM_BASE_URL, LLM_MODEL, LLM_VERIFY_SSL, api_jsonl_path, load_llm_api_key
+from config import LLM_BASE_URL, LLM_MODEL, LLM_VERIFY_SSL, api_jsonl_path, load_llm_api_key
 
 if not LLM_VERIFY_SSL:
     requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)

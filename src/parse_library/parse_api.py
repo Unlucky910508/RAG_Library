@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from parse_config import parsed_module_name, DATA_DIR, api_jsonl_path
+from config import parsed_module_name, DATA_DIR, api_jsonl_path
 
 
 def is_public(name):
