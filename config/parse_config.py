@@ -15,5 +15,9 @@ def api_jsonl_path(version):
     return DATA_DIR / f"{parsed_module_name}_{version}_api.jsonl"
 
 
+def chunks_jsonl_path(version):
+    return DATA_DIR / f"{parsed_module_name}_{version}_chunks.jsonl"
+
+
 def load_llm_api_key():
     return LLM_API_KEY_FILE.read_text(encoding="utf-8").strip()
