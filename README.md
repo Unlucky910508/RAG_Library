@@ -5,9 +5,10 @@ signatures, required/optional parameters, and an LLM-generated explanation
 per entry), so a local LLM/agent can look up API details instead of relying
 on its own possibly-wrong memory of the library.
 
-Output:
-- `data/pycolmap_{version}_api.jsonl` — one record per API (gitignored - generated locally).
-- `data/pycolmap_{version}_chunks.jsonl` — that data split into embedding chunks (gitignored - generated locally).
+Output (`data/` is gitignored - everything in it is generated locally):
+- `data/pycolmap_{version}_api.jsonl` — one record per API.
+- `data/pycolmap_{version}_chunks.jsonl` — that data split into embedding chunks (text only, no vectors).
+- `data/chroma/` — a persistent Chroma DB holding each chunk's text, metadata, and embedding vector.
 
 ## 1. Environment setup
 
@@ -28,7 +29,7 @@ pip install -r requirements.txt
 All commands below assume this env is active (or call its interpreter
 directly, e.g. `/path/to/envs/pycolmap/bin/python`).
 
-## 2. LLM config (only needed for `parse_explanations.py` and `parse_embeddings.py`)
+## 2. LLM config (only needed for `parse_explanations.py` and `load_vectordb.py`)
 
 - Edit `config/config.py`:
   - `LLM_BASE_URL` — your local OpenAI-compatible server, e.g. `http://localhost:8000/v1`
@@ -83,16 +84,17 @@ here. Which fields compose each chunk_type is a declarative recipe
 built from existing fields need only a config edit.
 
 ```bash
-python src/rag_ingest/parse_embeddings.py
+python src/rag_ingest/load_vectordb.py
 ```
 Calls a local OpenAI-compatible embeddings endpoint (`EMBEDDING_BASE_URL`/
 `EMBEDDING_MODEL` in `config/config.py`, defaults to the same server as
-`LLM_BASE_URL` with model `BAAI/bge-m3`) to add an `embedding` vector to
-each chunk, in place in `data/pycolmap_{version}_chunks.jsonl`. Same
-resumable/incremental-save/retry design as `parse_explanations.py`.
-
-Loading the embedded chunks into an actual vector DB is the remaining
-step in this phase, not yet written.
+`LLM_BASE_URL` with model `BAAI/bge-m3`) per chunk and loads the resulting
+vector straight into a Chroma collection at `data/chroma/` (one collection
+per pycolmap version, named via `chroma_collection_name()`), alongside the
+chunk's text and `{record_id, chunk_type}` metadata. The raw vector is
+never written to the chunks jsonl — resumability is tracked by which
+chunk_ids already exist in the Chroma collection instead. Same
+retry/incremental-flush design as `parse_explanations.py`.
 
 Scripts must be run by file path (`python src/<folder>/<script>.py`), not
 as a module (`-m`) — there is no `__init__.py` under `src/`.
