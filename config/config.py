@@ -25,6 +25,13 @@ def chunks_jsonl_path(version):
     return DATA_DIR / f"{parsed_module_name}_{version}_chunks.jsonl"
 
 
+CHROMA_DIR = DATA_DIR / "chroma"
+
+
+def chroma_collection_name(version):
+    return f"{parsed_module_name}_{version}"
+
+
 # Recipe for parse_chunks.py: each chunk_type is built by looking up and
 # concatenating "fields" (see FIELD_EXTRACTORS in parse_chunks.py) in
 # order. "required" lists which of those fields must actually be present
