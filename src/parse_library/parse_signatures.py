@@ -7,6 +7,7 @@ multiple numbered signatures in the docstring and become multiple list
 entries.
 """
 
+import enum
 import inspect
 import json
 import re
@@ -16,6 +17,14 @@ DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 OVERLOAD_LINE_RE = re.compile(r"^\d+\.\s+(.+)$")
 IMPLICIT_PARAM_NAMES = {"self", "cls"}
 PROPERTY_DEFAULT_RE = re.compile(r"\(([^,()]+),\s*default:\s*(.+)\)\s*$", re.DOTALL)
+
+
+def is_enum_class(obj):
+    """pybind11 enums expose __members__ but are not enum.Enum subclasses,
+    so both checks are needed to cover binding and pure-Python libraries."""
+    if not inspect.isclass(obj):
+        return False
+    return hasattr(obj, "__members__") or issubclass(obj, enum.Enum)
 
 
 def resolve_object(qualified_name):
@@ -143,12 +152,16 @@ def parse_property_default(doc):
 
 
 def build_class_kwargs_index(records):
-    """Map a class's qualified name to its properties/attributes, since
+    """Map a class's qualified name to its writable properties, since
     pybind11's `__init__(self, **kwargs)` overload sets each kwarg as one
-    of these - the docstring itself never lists them individually."""
+    of these - the docstring itself never lists them individually.
+
+    Only properties qualify: the kwargs are applied via setattr, so a
+    read-only property is rejected, and attributes (enum members, module
+    constants) are never constructor arguments in the first place."""
     index = {}
     for record in records:
-        if record["kind"] not in ("property", "attribute"):
+        if record["kind"] != "property" or not record.get("writable"):
             continue
         owner, _, name = record["name"].rpartition(".")
         doc = record["signatures"][0] if record["signatures"] else ""
@@ -181,13 +194,54 @@ def build_parameters(record, kwargs_index):
     return overloads
 
 
+def json_safe(value):
+    """Bindings expose opaque C++ types (data_t, sensor_t) that json can't
+    encode, so fall back to their repr."""
+    try:
+        json.dumps(value)
+        return value
+    except (TypeError, ValueError):
+        return repr(value)
+
+
+def enum_member_value(member):
+    return json_safe(getattr(member, "value", member))
+
+
+def list_enum_members(cls):
+    """__members__ is in declaration order, which matches the underlying
+    values; dir() would only give an alphabetical shuffle of them."""
+    return [
+        {"name": name, "value": enum_member_value(member)}
+        for name, member in cls.__members__.items()
+    ]
+
+
+def enrich_value_fields(record, obj):
+    kind = record["kind"]
+    if kind == "property":
+        record["writable"] = isinstance(obj, property) and obj.fset is not None
+    elif kind == "class" and is_enum_class(obj):
+        record["members"] = list_enum_members(obj)
+    elif kind == "enum_member":
+        record["enum_of"] = record["name"].rpartition(".")[0]
+        record["value"] = enum_member_value(obj)
+    elif kind == "constant":
+        record["type"] = type(obj).__name__
+        record["value"] = json_safe(obj)
+
+
 def enrich_records(records):
     for record in records:
         try:
             obj = resolve_object(record["name"])
             record["signatures"] = extract_signatures(record["kind"], obj)
         except Exception:
+            obj = None
             record["signatures"] = []
+
+        if obj is not None:
+            enrich_value_fields(record, obj)
 
     kwargs_index = build_class_kwargs_index(records)
     for record in records:

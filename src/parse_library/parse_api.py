@@ -3,6 +3,7 @@
 Each output line is one JSON object: {"name": "<qualified.name>", "kind": "<module|class|function|method|property|attribute>"}
 """
 
+import enum
 import inspect
 import json
 from pathlib import Path
@@ -16,6 +17,14 @@ def is_public(name):
     return not name.startswith("_")
 
 
+def is_enum_class(obj):
+    """pybind11 enums expose __members__ but are not enum.Enum subclasses,
+    so both checks are needed to cover binding and pure-Python libraries."""
+    if not inspect.isclass(obj):
+        return False
+    return hasattr(obj, "__members__") or issubclass(obj, enum.Enum)
+
+
 def classify(owner, member):
     if inspect.ismodule(member):
         return "module"
@@ -25,7 +34,9 @@ def classify(owner, member):
         return "property"
     if inspect.isroutine(member):
         return "method" if inspect.isclass(owner) else "function"
-    return "attribute"
+    if is_enum_class(owner) and isinstance(member, owner):
+        return "enum_member"
+    return "constant"
 
 
 def belongs_to_package(member, kind, root_name):
