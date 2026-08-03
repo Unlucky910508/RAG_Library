@@ -65,7 +65,11 @@ def call_llm(record, api_key):
         timeout=60,
         verify=LLM_VERIFY_SSL,
     )
-    response.raise_for_status()
+    if not response.ok:
+        raise requests.HTTPError(
+            f"{response.status_code} {response.reason} for {response.url}: {response.text[:500]}",
+            response=response,
+        )
     return response.json()["choices"][0]["message"]["content"].strip()
 
 
