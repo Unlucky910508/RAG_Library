@@ -28,7 +28,7 @@ def chunks_jsonl_path(version):
 # the field extractors you list already exist.
 CHUNK_FIELDS = {
     "explanation": {
-        "fields": ["explanation"],
+        "fields": ["name", "explanation"],
         "required": ["explanation"],
     },
     "signature": {

@@ -38,8 +38,12 @@ directly, e.g. `/path/to/envs/pycolmap/bin/python`).
 
 ## 3. Running the pipeline
 
-Run in this order from the repo root. Each step reads the output of the
-previous one and writes back to the same `data/*.jsonl` file.
+Two phases: `src/parse_library/` produces the raw per-API data, then
+`src/rag_ingest/` turns that data into what a RAG system actually indexes.
+Run in this order from the repo root — each step reads the previous one's
+output.
+
+### Phase 1 — raw data (`src/parse_library/`)
 
 ```bash
 python src/parse_library/parse_api.py
@@ -63,8 +67,10 @@ retrieval-friendly explanation per record, grounded only in that record's
 own fields. Resumable — safe to re-run if interrupted, already-explained
 records are skipped.
 
+### Phase 2 — into the RAG store (`src/rag_ingest/`)
+
 ```bash
-python src/parse_library/parse_chunks.py
+python src/rag_ingest/parse_chunks.py
 ```
 Splits each record into one or more embedding chunks — currently an
 `explanation` chunk and a `signature` chunk (name + signatures + parameter
@@ -72,12 +78,16 @@ names) — so conceptual and precise/parameter-level queries can each match
 a chunk suited to that style. Writes `data/pycolmap_{version}_chunks.jsonl`.
 Chunks only carry `record_id`/`chunk_type`/`text`; the full record is looked
 up by `record_id` in the API jsonl once a chunk matches, not duplicated
-here. Embedding the chunk text into vectors and loading them into a vector
-DB is a separate step, run elsewhere (the embedding model isn't local to
-this machine).
+here. Which fields compose each chunk_type is a declarative recipe
+(`CHUNK_FIELDS` in `config/parse_config.py`), not code — new chunk types
+built from existing fields need only a config edit.
 
-Scripts must be run by file path (`python src/parse_library/<script>.py`),
-not as a module (`-m`) — there is no `__init__.py` under `src/`.
+Embedding the chunk text into vectors and loading them into a vector DB is
+a further step in this phase, run elsewhere (the embedding model isn't
+local to this machine).
+
+Scripts must be run by file path (`python src/<folder>/<script>.py`), not
+as a module (`-m`) — there is no `__init__.py` under `src/`.
 
 ## 4. Notes
 
