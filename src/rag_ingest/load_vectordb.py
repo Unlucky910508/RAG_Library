@@ -3,10 +3,14 @@ not local to this machine) and load it straight into a Chroma collection.
 
 The raw vector is never written back to the chunks jsonl - it's only
 meaningful to a vector index, so it goes directly into Chroma alongside
-the chunk's text and metadata. Resumability is tracked by which chunk_ids
-already exist in the collection, not by a field in the jsonl.
+the chunk's text and metadata. A chunk is skipped only if its chunk_id
+already exists in the collection AND its text is unchanged (compared via
+a stored hash) - a new chunk_id gets added, and an existing chunk_id whose
+text changed (edited explanation, a chunk_type's field recipe changed,
+etc.) gets re-embedded and upserted in place.
 """
 
+import hashlib
 import json
 import sys
 import time
@@ -42,6 +46,10 @@ def chunk_id(chunk):
     return f"{chunk['record_id']}::{chunk['chunk_type']}"
 
 
+def text_hash(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
 def call_embedding(text, api_key):
     response = requests.post(
         f"{EMBEDDING_BASE_URL}/embeddings",
@@ -69,23 +77,29 @@ def call_embedding_with_retry(chunk, api_key):
             time.sleep(2 ** attempt)
 
 
-def find_pending_chunks(collection, chunks):
-    all_ids = [chunk_id(c) for c in chunks]
-    existing_ids = set()
-    for i in range(0, len(all_ids), 200):
-        existing_ids.update(collection.get(ids=all_ids[i:i + 200])["ids"])
-    return [c for c in chunks if chunk_id(c) not in existing_ids]
+def fetch_existing_hashes(collection, ids):
+    existing_hashes = {}
+    for i in range(0, len(ids), 200):
+        batch = collection.get(ids=ids[i:i + 200], include=["metadatas"])
+        for id_, metadata in zip(batch["ids"], batch["metadatas"]):
+            existing_hashes[id_] = metadata.get("text_hash")
+    return existing_hashes
+
+
+def find_changed_or_new_chunks(collection, chunks):
+    existing_hashes = fetch_existing_hashes(collection, [chunk_id(c) for c in chunks])
+    return [c for c in chunks if existing_hashes.get(chunk_id(c)) != text_hash(c["text"])]
 
 
 def load_chunks(collection, chunks, api_key):
-    pending = find_pending_chunks(collection, chunks)
-    print(f"{len(chunks)} chunks, {len(pending)} need embedding + loading")
+    pending = find_changed_or_new_chunks(collection, chunks)
+    print(f"{len(chunks)} chunks, {len(pending)} new or changed, need embedding + loading")
 
     batch_ids, batch_embeddings, batch_documents, batch_metadatas = [], [], [], []
 
     def flush():
         if batch_ids:
-            collection.add(ids=batch_ids, embeddings=batch_embeddings, documents=batch_documents, metadatas=batch_metadatas)
+            collection.upsert(ids=batch_ids, embeddings=batch_embeddings, documents=batch_documents, metadatas=batch_metadatas)
             batch_ids.clear()
             batch_embeddings.clear()
             batch_documents.clear()
@@ -97,7 +111,11 @@ def load_chunks(collection, chunks, api_key):
             batch_ids.append(chunk_id(chunk))
             batch_embeddings.append(embedding)
             batch_documents.append(chunk["text"])
-            batch_metadatas.append({"record_id": chunk["record_id"], "chunk_type": chunk["chunk_type"]})
+            batch_metadatas.append({
+                "record_id": chunk["record_id"],
+                "chunk_type": chunk["chunk_type"],
+                "text_hash": text_hash(chunk["text"]),
+            })
             print(f"  [{i + 1}/{len(pending)}] {chunk['record_id']} ({chunk['chunk_type']})")
 
         if (i + 1) % SAVE_EVERY == 0:
