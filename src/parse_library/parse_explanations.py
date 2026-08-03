@@ -15,7 +15,10 @@ from pathlib import Path
 import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from parse_config import LLM_BASE_URL, LLM_MODEL, api_jsonl_path, load_llm_api_key
+from parse_config import LLM_BASE_URL, LLM_MODEL, LLM_VERIFY_SSL, api_jsonl_path, load_llm_api_key
+
+if not LLM_VERIFY_SSL:
+    requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
 SYSTEM_PROMPT = (
     "You write short, retrieval-friendly explanations for a RAG database of "
@@ -60,6 +63,7 @@ def call_llm(record, api_key):
             ],
         },
         timeout=60,
+        verify=LLM_VERIFY_SSL,
     )
     response.raise_for_status()
     return response.json()["choices"][0]["message"]["content"].strip()
@@ -69,7 +73,7 @@ def call_llm_with_retry(record, api_key):
     for attempt in range(MAX_RETRIES):
         try:
             return call_llm(record, api_key)
-        except (requests.RequestException, KeyError, IndexError) as e:
+        except Exception as e:
             if attempt == MAX_RETRIES - 1:
                 print(f"  FAILED {record['name']}: {e}")
                 return None
