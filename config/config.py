@@ -10,6 +10,12 @@ LLM_API_KEY_FILE = Path(__file__).resolve().parent / "key.txt"
 # certificate - this disables TLS certificate verification entirely.
 LLM_VERIFY_SSL = False
 
+# Same server by default (one OpenAI-compatible endpoint serving both
+# /chat/completions and /embeddings) - override independently if your
+# embedding model is actually hosted elsewhere.
+EMBEDDING_BASE_URL = LLM_BASE_URL
+EMBEDDING_MODEL = "BAAI/bge-m3"
+
 
 def api_jsonl_path(version):
     return DATA_DIR / f"{parsed_module_name}_{version}_api.jsonl"
