@@ -22,6 +22,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
 from config import (
     CHROMA_DIR,
+    CHROMA_DISTANCE_METRIC,
     EMBEDDING_BASE_URL,
     EMBEDDING_MODEL,
     LLM_VERIFY_SSL,
@@ -131,7 +132,10 @@ def main():
     api_key = load_llm_api_key()
 
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-    collection = client.get_or_create_collection(name=chroma_collection_name(pycolmap.__version__))
+    collection = client.get_or_create_collection(
+        name=chroma_collection_name(pycolmap.__version__),
+        metadata={"hnsw:space": CHROMA_DISTANCE_METRIC},
+    )
 
     load_chunks(collection, chunks, api_key)
     print(f"Done. Collection '{collection.name}' now has {collection.count()} chunks.")

@@ -26,6 +26,11 @@ def chunks_jsonl_path(version):
 
 
 CHROMA_DIR = DATA_DIR / "chroma"
+# BAAI/bge-m3 (like most embedding models) is trained/evaluated for cosine
+# similarity, not Chroma's default squared-L2 distance. Only affects a
+# collection at creation time - set here so load_vectordb.py and
+# search.py can never create it with mismatched metrics.
+CHROMA_DISTANCE_METRIC = "cosine"
 
 
 def chroma_collection_name(version):

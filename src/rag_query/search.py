@@ -15,6 +15,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
 from config import (
     CHROMA_DIR,
+    CHROMA_DISTANCE_METRIC,
     EMBEDDING_BASE_URL,
     EMBEDDING_MODEL,
     LLM_VERIFY_SSL,
@@ -43,7 +44,10 @@ def load_records_by_id(version):
 
 def get_collection(version):
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
-    return client.get_or_create_collection(name=chroma_collection_name(version))
+    return client.get_or_create_collection(
+        name=chroma_collection_name(version),
+        metadata={"hnsw:space": CHROMA_DISTANCE_METRIC},
+    )
 
 
 def embed_query(text, api_key):
