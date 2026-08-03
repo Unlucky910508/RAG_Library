@@ -15,6 +15,7 @@ from pathlib import Path
 DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
 OVERLOAD_LINE_RE = re.compile(r"^\d+\.\s+(.+)$")
 IMPLICIT_PARAM_NAMES = {"self", "cls"}
+PROPERTY_DEFAULT_RE = re.compile(r"\(([^,()]+),\s*default:\s*(.+)\)\s*$", re.DOTALL)
 
 
 def resolve_object(qualified_name):
@@ -134,10 +135,50 @@ def parse_signature_parameters(signature):
     return params
 
 
-def build_parameters(kind, signatures):
-    if kind not in ("function", "method"):
+def parse_property_default(doc):
+    match = PROPERTY_DEFAULT_RE.search(doc)
+    if not match:
+        return None, None
+    return match.group(1).strip(), match.group(2).strip()
+
+
+def build_class_kwargs_index(records):
+    """Map a class's qualified name to its properties/attributes, since
+    pybind11's `__init__(self, **kwargs)` overload sets each kwarg as one
+    of these - the docstring itself never lists them individually."""
+    index = {}
+    for record in records:
+        if record["kind"] not in ("property", "attribute"):
+            continue
+        owner, _, name = record["name"].rpartition(".")
+        doc = record["signatures"][0] if record["signatures"] else ""
+        type_, default = parse_property_default(doc)
+        index.setdefault(owner, []).append({
+            "name": name,
+            "type": type_,
+            "required": False,
+            "default": default,
+        })
+    return index
+
+
+def expand_kwargs_param(param, record_name, kwargs_index):
+    if param["name"] != "**kwargs" or not record_name.endswith(".__init__"):
+        return [param]
+    class_name = record_name.rpartition(".")[0]
+    return kwargs_index.get(class_name) or [param]
+
+
+def build_parameters(record, kwargs_index):
+    if record["kind"] not in ("function", "method"):
         return []
-    return [parse_signature_parameters(sig) for sig in signatures]
+    overloads = []
+    for signature in record["signatures"]:
+        params = []
+        for param in parse_signature_parameters(signature):
+            params.extend(expand_kwargs_param(param, record["name"], kwargs_index))
+        overloads.append(params)
+    return overloads
 
 
 def enrich_records(records):
@@ -147,7 +188,10 @@ def enrich_records(records):
             record["signatures"] = extract_signatures(record["kind"], obj)
         except Exception:
             record["signatures"] = []
-        record["parameters"] = build_parameters(record["kind"], record["signatures"])
+
+    kwargs_index = build_class_kwargs_index(records)
+    for record in records:
+        record["parameters"] = build_parameters(record, kwargs_index)
     return records
 
 
