@@ -39,10 +39,10 @@ directly, e.g. `/path/to/envs/pycolmap/bin/python`).
 
 ## 3. Running the pipeline
 
-Two phases: `src/parse_library/` produces the raw per-API data, then
-`src/rag_ingest/` turns that data into what a RAG system actually indexes.
-Run in this order from the repo root — each step reads the previous one's
-output.
+Three phases: `src/parse_library/` produces the raw per-API data,
+`src/rag_ingest/` turns that data into what a RAG system actually indexes,
+and `src/rag_query/` serves it to a coding agent. Run in this order from
+the repo root — each step reads the previous one's output.
 
 ### Phase 1 — raw data (`src/parse_library/`)
 
@@ -98,6 +98,20 @@ its stored `text_hash` still matches; otherwise it's (re-)embedded and
 `upsert()`'d, so edited explanations or reshaped chunk_types get picked up
 on a rerun instead of silently staying stale. Same retry/incremental-flush
 design as `parse_explanations.py`.
+
+### Phase 3 — serving queries (`src/rag_query/`)
+
+- `search.py`: the actual RAG search logic (embed a query via the
+  configured embeddings endpoint, query the Chroma collection, resolve
+  each hit's `record_id` back to its full record, dedupe multiple
+  matching chunk_types down to one hit per record). No MCP dependency —
+  importable by any consumer, not just an MCP server.
+- `mcp_server.py`: thin MCP wrapper around `search.py`, exposing a
+  `search_pycolmap_api(query, top_k=5)` tool over stdio for a coding
+  agent to call directly:
+  ```bash
+  python src/rag_query/mcp_server.py
+  ```
 
 Scripts must be run by file path (`python src/<folder>/<script>.py`), not
 as a module (`-m`) — there is no `__init__.py` under `src/`.
