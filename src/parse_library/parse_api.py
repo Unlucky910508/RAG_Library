@@ -6,9 +6,11 @@ Each output line is one JSON object: {"name": "<qualified.name>", "kind": "<modu
 import enum
 import inspect
 import json
+import sys
 from pathlib import Path
 
-DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
+from parse_config import parsed_module_name, DATA_DIR, api_jsonl_path
 
 
 def is_public(name):
@@ -81,14 +83,10 @@ def write_jsonl(records, output_path):
 
 
 def main():
-    # setting parsed module & import 
-    parsed_module_name = "pycolmap"
     root = __import__(parsed_module_name)
 
-    # setting output file name
-    version = root.__version__
     DATA_DIR.mkdir(parents=True, exist_ok=True)
-    output_file = DATA_DIR / f"pycolmap_{version}_api.jsonl"
+    output_file = api_jsonl_path(root.__version__)
 
     records = collect_apis(root, parsed_module_name)
 

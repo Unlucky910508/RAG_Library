@@ -11,9 +11,12 @@ import enum
 import inspect
 import json
 import re
+import sys
 from pathlib import Path
 
-DATA_DIR = Path(__file__).resolve().parent.parent.parent / "data"
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
+from parse_config import api_jsonl_path
+
 OVERLOAD_LINE_RE = re.compile(r"^\d+\.\s+(.+)$")
 IMPLICIT_PARAM_NAMES = {"self", "cls"}
 PROPERTY_DEFAULT_RE = re.compile(r"\(([^,()]+),\s*default:\s*(.+)\)\s*$", re.DOTALL)
@@ -263,7 +266,7 @@ def write_jsonl(records, path):
 def main():
     import pycolmap
 
-    path = DATA_DIR / f"pycolmap_{pycolmap.__version__}_api.jsonl"
+    path = api_jsonl_path(pycolmap.__version__)
 
     records = read_jsonl(path)
     enrich_records(records)
