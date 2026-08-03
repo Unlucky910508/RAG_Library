@@ -91,10 +91,13 @@ Calls a local OpenAI-compatible embeddings endpoint (`EMBEDDING_BASE_URL`/
 `LLM_BASE_URL` with model `BAAI/bge-m3`) per chunk and loads the resulting
 vector straight into a Chroma collection at `data/chroma/` (one collection
 per pycolmap version, named via `chroma_collection_name()`), alongside the
-chunk's text and `{record_id, chunk_type}` metadata. The raw vector is
-never written to the chunks jsonl — resumability is tracked by which
-chunk_ids already exist in the Chroma collection instead. Same
-retry/incremental-flush design as `parse_explanations.py`.
+chunk's text and `{record_id, chunk_type, text_hash}` metadata. The raw
+vector is never written to the chunks jsonl — a chunk is only skipped if
+its `chunk_id` (`record_id::chunk_type`) already exists in Chroma *and*
+its stored `text_hash` still matches; otherwise it's (re-)embedded and
+`upsert()`'d, so edited explanations or reshaped chunk_types get picked up
+on a rerun instead of silently staying stale. Same retry/incremental-flush
+design as `parse_explanations.py`.
 
 Scripts must be run by file path (`python src/<folder>/<script>.py`), not
 as a module (`-m`) — there is no `__init__.py` under `src/`.
