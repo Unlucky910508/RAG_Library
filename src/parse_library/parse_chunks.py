@@ -7,6 +7,13 @@ argument") can each match a chunk suited to that query style. Chunks only
 carry record_id + chunk_type + text - the full record already lives in the
 API jsonl and is looked up by record_id after a chunk matches, so nothing
 is duplicated here.
+
+Which fields make up which chunk_type is a data-only recipe
+(CHUNK_FIELDS in config/parse_config.py), not code: FIELD_EXTRACTORS below
+is the one-function-per-JSON-field vocabulary the recipe draws from, and
+build_chunk_text() just looks up and concatenates whichever ones a given
+chunk_type lists. Adding or reshaping a chunk_type out of existing fields
+is a config edit; only a genuinely new field needs a new extractor here.
 """
 
 import json
@@ -14,7 +21,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from parse_config import api_jsonl_path, chunks_jsonl_path
+from parse_config import CHUNK_FIELDS, api_jsonl_path, chunks_jsonl_path
 
 
 def read_jsonl(path):
@@ -28,30 +35,66 @@ def write_jsonl(records, path):
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
-def build_explanation_chunk_text(record):
-    return record.get("explanation") or None
+def extract_name(record):
+    return record.get("name")
 
 
-def build_signature_chunk_text(record):
-    if not record.get("signatures"):
-        return None
-    lines = [record["name"], *record["signatures"]]
-    param_names = sorted({p["name"] for overload in record.get("parameters", []) for p in overload})
-    if param_names:
-        lines.append("parameters: " + ", ".join(param_names))
-    return "\n".join(lines)
+def extract_kind(record):
+    return record.get("kind")
 
 
-CHUNK_BUILDERS = {
-    "explanation": build_explanation_chunk_text,
-    "signature": build_signature_chunk_text,
+def extract_explanation(record):
+    return record.get("explanation")
+
+
+def extract_signatures(record):
+    signatures = record.get("signatures")
+    return "\n".join(signatures) if signatures else None
+
+
+def extract_parameter_names(record):
+    names = sorted({p["name"] for overload in record.get("parameters", []) for p in overload})
+    return "parameters: " + ", ".join(names) if names else None
+
+
+def extract_enum_members(record):
+    members = record.get("members")
+    return "members: " + ", ".join(m["name"] for m in members) if members else None
+
+
+def extract_enum_of(record):
+    enum_of = record.get("enum_of")
+    return f"belongs to enum: {enum_of}" if enum_of else None
+
+
+def extract_value(record):
+    return f"value: {record['value']}" if "value" in record else None
+
+
+FIELD_EXTRACTORS = {
+    "name": extract_name,
+    "kind": extract_kind,
+    "explanation": extract_explanation,
+    "signatures": extract_signatures,
+    "parameter_names": extract_parameter_names,
+    "enum_members": extract_enum_members,
+    "enum_of": extract_enum_of,
+    "value": extract_value,
 }
+
+
+def build_chunk_text(record, field_keys):
+    parts = [FIELD_EXTRACTORS[key](record) for key in field_keys]
+    parts = [p for p in parts if p]
+    return "\n".join(parts) if parts else None
 
 
 def build_chunks(record):
     chunks = []
-    for chunk_type, build_text in CHUNK_BUILDERS.items():
-        text = build_text(record)
+    for chunk_type, spec in CHUNK_FIELDS.items():
+        if any(not FIELD_EXTRACTORS[key](record) for key in spec["required"]):
+            continue
+        text = build_chunk_text(record, spec["fields"])
         if text:
             chunks.append({"record_id": record["name"], "chunk_type": chunk_type, "text": text})
     return chunks
