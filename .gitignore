@@ -1,3 +1,4 @@
 *.jsonl
 __pycache__/
 KNOWN_ISSUES.md
+config/key.txt
