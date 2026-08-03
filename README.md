@@ -90,14 +90,18 @@ Calls a local OpenAI-compatible embeddings endpoint (`EMBEDDING_BASE_URL`/
 `EMBEDDING_MODEL` in `config/config.py`, defaults to the same server as
 `LLM_BASE_URL` with model `BAAI/bge-m3`) per chunk and loads the resulting
 vector straight into a Chroma collection at `data/chroma/` (one collection
-per pycolmap version, named via `chroma_collection_name()`), alongside the
-chunk's text and `{record_id, chunk_type, text_hash}` metadata. The raw
-vector is never written to the chunks jsonl — a chunk is only skipped if
-its `chunk_id` (`record_id::chunk_type`) already exists in Chroma *and*
-its stored `text_hash` still matches; otherwise it's (re-)embedded and
-`upsert()`'d, so edited explanations or reshaped chunk_types get picked up
-on a rerun instead of silently staying stale. Same retry/incremental-flush
-design as `parse_explanations.py`.
+per pycolmap version, named via `chroma_collection_name()`, created with
+`hnsw:space` set to `CHROMA_DISTANCE_METRIC` — `cosine` by default, matching
+what embedding models like `BAAI/bge-m3` are actually trained/evaluated
+for, instead of Chroma's default squared-L2 — this only takes effect when
+the collection is first created), alongside the chunk's text and
+`{record_id, chunk_type, text_hash}` metadata. The raw vector is never
+written to the chunks jsonl — a chunk is only skipped if its `chunk_id`
+(`record_id::chunk_type`) already exists in Chroma *and* its stored
+`text_hash` still matches; otherwise it's (re-)embedded and `upsert()`'d,
+so edited explanations or reshaped chunk_types get picked up on a rerun
+instead of silently staying stale. Same retry/incremental-flush design as
+`parse_explanations.py`.
 
 ### Phase 3 — serving queries (`src/rag_query/`)
 
