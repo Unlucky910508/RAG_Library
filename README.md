@@ -5,7 +5,9 @@ signatures, required/optional parameters, and an LLM-generated explanation
 per entry), so a local LLM/agent can look up API details instead of relying
 on its own possibly-wrong memory of the library.
 
-Output: `data/pycolmap_{version}_api.jsonl` (gitignored - generated locally).
+Output:
+- `data/pycolmap_{version}_api.jsonl` — one record per API (gitignored - generated locally).
+- `data/pycolmap_{version}_chunks.jsonl` — that data split into embedding chunks (gitignored - generated locally).
 
 ## 1. Environment setup
 
@@ -60,6 +62,19 @@ Calls the local LLM configured in step 2 to generate a short,
 retrieval-friendly explanation per record, grounded only in that record's
 own fields. Resumable — safe to re-run if interrupted, already-explained
 records are skipped.
+
+```bash
+python src/parse_library/parse_chunks.py
+```
+Splits each record into one or more embedding chunks — currently an
+`explanation` chunk and a `signature` chunk (name + signatures + parameter
+names) — so conceptual and precise/parameter-level queries can each match
+a chunk suited to that style. Writes `data/pycolmap_{version}_chunks.jsonl`.
+Chunks only carry `record_id`/`chunk_type`/`text`; the full record is looked
+up by `record_id` in the API jsonl once a chunk matches, not duplicated
+here. Embedding the chunk text into vectors and loading them into a vector
+DB is a separate step, run elsewhere (the embedding model isn't local to
+this machine).
 
 Scripts must be run by file path (`python src/parse_library/<script>.py`),
 not as a module (`-m`) — there is no `__init__.py` under `src/`.
