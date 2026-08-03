@@ -1,3 +1,4 @@
 pycolmap==4.1.0
 requests==2.34.2
 chromadb==1.5.9
+mcp==2.0.0
