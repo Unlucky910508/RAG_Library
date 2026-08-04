@@ -18,7 +18,7 @@ mcp = MCPServer(name="pycolmap-rag")
 
 
 @mcp.tool()
-def search_pycolmap_api(query: str, top_k: int = 5) -> list[dict]:
+def search_rag(query: str, top_k: int = 5) -> list[dict]:
     """Search the PyColmap API for classes, functions, methods, or
     properties matching a natural-language or code-shaped query. Returns
     each match's full API record (signatures, parameters, explanation)."""
