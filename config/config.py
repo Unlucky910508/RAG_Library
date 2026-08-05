@@ -4,7 +4,7 @@ parsed_module_name = "pycolmap"
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 
 LLM_BASE_URL = "http://localhost:8000/v1"
-LLM_MODEL = "Qwen3.6-35B-A3B-FP8"
+LLM_MODEL = "Qwen/Qwen3.6-35B-A3B-FP8"
 LLM_API_KEY_FILE = Path(__file__).resolve().parent / "key.txt"
 # Set to False only for known/trusted internal servers using a self-signed
 # certificate - this disables TLS certificate verification entirely.
