@@ -72,6 +72,37 @@ def extract_signatures(kind, obj):
     return [first_line] if first_line else []
 
 
+def extract_doc(kind, obj):
+    """Descriptive text from the docstring, beyond what extract_signatures
+    keeps: deprecation notes, per-overload explanations, class summaries.
+    Properties are excluded - their whole docstring already lands in
+    signatures[0]."""
+    doc = inspect.getdoc(obj)
+    if not doc:
+        return None
+
+    if kind in ("function", "method"):
+        kept = []
+        # First line is always a signature or a "name(*args, **kwargs)" header.
+        for line in doc.splitlines()[1:]:
+            stripped = line.strip()
+            if not stripped or stripped == "Overloaded function.":
+                continue
+            if OVERLOAD_LINE_RE.match(stripped):
+                continue
+            if stripped not in kept:
+                kept.append(stripped)
+        return "\n".join(kept) or None
+
+    if kind in ("class", "module"):
+        # pybind11 enum docstrings append a "Members:" listing; the members
+        # are already stored structurally, keep only the prose before it.
+        text = doc.split("Members:")[0].strip()
+        return text or None
+
+    return None
+
+
 def split_top_level(text, separator):
     parts = []
     depth = 0
@@ -245,6 +276,9 @@ def enrich_records(records):
 
         if obj is not None:
             enrich_value_fields(record, obj)
+            doc = extract_doc(record["kind"], obj)
+            if doc:
+                record["doc"] = doc
 
     kwargs_index = build_class_kwargs_index(records)
     for record in records:

@@ -47,6 +47,10 @@ def extract_explanation(record):
     return record.get("explanation")
 
 
+def extract_doc(record):
+    return record.get("doc")
+
+
 def extract_signatures(record):
     signatures = record.get("signatures")
     return "\n".join(signatures) if signatures else None
@@ -75,6 +79,7 @@ FIELD_EXTRACTORS = {
     "name": extract_name,
     "kind": extract_kind,
     "explanation": extract_explanation,
+    "doc": extract_doc,
     "signatures": extract_signatures,
     "parameter_names": extract_parameter_names,
     "enum_members": extract_enum_members,

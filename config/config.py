@@ -46,7 +46,7 @@ def chroma_collection_name(version):
 # the field extractors you list already exist.
 CHUNK_FIELDS = {
     "explanation": {
-        "fields": ["name", "explanation"],
+        "fields": ["name", "doc", "explanation"],
         "required": ["explanation"],
     },
     "signature": {
