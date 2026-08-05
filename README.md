@@ -57,8 +57,13 @@ constant) to `data/pycolmap_{version}_api.jsonl`.
 python src/parse_library/parse_signatures.py
 ```
 Enriches each record in place with signatures, structured parameters
-(required/optional, overload-aware), and kind-specific fields (`writable`,
-`members`, `enum_of`, `value`, `type`).
+(required/optional, overload-aware), a `doc` field holding the docstring's
+descriptive text beyond the signatures (deprecation notes, per-overload
+explanations, class summaries), and kind-specific fields (`writable`,
+`members`, `enum_of`, `value`, `type`). Only touches the fields it owns —
+anything else already in the jsonl (e.g. `explanation`) survives a rerun,
+so it's safe to re-run on an already-explained dataset to pick up new
+fields. Only `parse_api.py` rebuilds the file from scratch.
 
 ```bash
 python src/parse_library/parse_explanations.py
@@ -74,7 +79,8 @@ records are skipped.
 python src/rag_ingest/parse_chunks.py
 ```
 Splits each record into one or more embedding chunks — currently an
-`explanation` chunk and a `signature` chunk (name + signatures + parameter
+`explanation` chunk (name + official docstring text + generated
+explanation) and a `signature` chunk (name + signatures + parameter
 names) — so conceptual and precise/parameter-level queries can each match
 a chunk suited to that style. Writes `data/pycolmap_{version}_chunks.jsonl`.
 Chunks only carry `record_id`/`chunk_type`/`text`; the full record is looked
