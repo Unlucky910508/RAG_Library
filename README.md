@@ -121,9 +121,20 @@ its own paired chunk file, name derived automatically
 a future record source needs no config change. Chunks only carry
 `record_id`/`chunk_type`/`text`; the full record is looked up by
 `record_id` in the record jsonls once a chunk matches, not duplicated
-here. Which fields compose each chunk_type is a declarative recipe
-(`CHUNK_FIELDS` in `config/config.py`), not code — new chunk types
-built from existing fields need only a config edit.
+here.
+
+Which fields compose each chunk_type is a declarative recipe
+(`CHUNK_FIELDS` in `config/config.py`), not code. Each recipe names three
+lists, all drawn from the field vocabulary in
+`src/common/record_fields.py`:
+
+- `embedding_fields` — concatenated into the text that gets embedded and matched against queries (used here)
+- `required` — fields a record must actually have for this chunk_type to apply at all
+- `return_fields` — concatenated into the text handed back on a hit (used by `search.py`)
+
+Splitting embedding from return means a chunk can be *found* by one kind
+of text and *answered* with another. Recombining existing fields is a
+config edit; only a genuinely new field needs a new renderer.
 
 ```bash
 python src/rag_ingest/load_vectordb.py
@@ -151,12 +162,16 @@ instead of silently staying stale. Same retry/incremental-flush design as
 ### Phase 3 — serving queries (`src/rag_query/`)
 
 - `search.py`: the actual RAG search logic (embed a query via the
-  configured embeddings endpoint, query the Chroma collection, resolve
-  each hit's `record_id` back to its full record, dedupe multiple
-  matching chunk_types down to one hit per record). No MCP dependency —
-  importable by any consumer, not just an MCP server.
+  configured embeddings endpoint, query the Chroma collection, dedupe
+  multiple matching chunk_types down to one hit per record, then render
+  each hit's record through the matched chunk_type's `return_fields`).
+  Each hit is `{record_id, matched_chunk_type, distance, text}`. The
+  returned text is assembled at query time rather than read from the
+  vector DB, so editing a recipe's `return_fields` takes effect on the
+  next query with no re-embedding. No MCP dependency — importable by any
+  consumer, not just an MCP server.
 - `mcp_server.py`: thin MCP wrapper around `search.py`, exposing a
-  `search_pycolmap_api(query, top_k=5)` tool over stdio for a coding
+  `search_rag(query, top_k=5)` tool over stdio for a coding
   agent to call directly:
   ```bash
   python src/rag_query/mcp_server.py
