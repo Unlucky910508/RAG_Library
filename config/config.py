@@ -23,6 +23,13 @@ EMBEDDING_MODEL = "BAAI/bge-m3"
 EXAMPLES_GITHUB_REPO = "colmap/colmap"
 EXAMPLES_PATH_IN_REPO = "python/examples"
 EXAMPLES_LICENSE = "BSD-3-Clause (COLMAP)"
+# Downloaded .py files land here, with a _manifest.json recording where
+# each came from. parse_code.py reads this directory; it never downloads.
+EXAMPLES_MANIFEST_NAME = "_manifest.json"
+
+
+def examples_src_dir(version):
+    return DATA_DIR / f"{parsed_module_name}_{version}_examples_src"
 
 
 def api_jsonl_path(version):

@@ -8,7 +8,8 @@ library.
 
 Output (`data/` is gitignored - everything in it is generated locally):
 - `data/pycolmap_{version}_api.jsonl` — one record per API.
-- `data/pycolmap_{version}_examples.jsonl` — official example code split into per-function records.
+- `data/pycolmap_{version}_examples_src/` — the downloaded official example `.py` files, plus a `_manifest.json` of where each came from.
+- `data/pycolmap_{version}_examples.jsonl` — that example code split into per-function records.
 - `data/pycolmap_{version}_api_chunks.jsonl` / `..._examples_chunks.jsonl` — that data split into embedding chunks, one chunk file per record file (text only, no vectors).
 - `data/chroma/` — a persistent Chroma DB holding each chunk's text, metadata, and embedding vector.
 
@@ -68,17 +69,32 @@ so it's safe to re-run on an already-explained dataset to pick up new
 fields. Only `parse_api.py` rebuilds the file from scratch.
 
 ```bash
-python src/parse_library/parse_examples.py
+python src/parse_library/fetch_official_example_code.py
 ```
-Fetches the official example scripts from the colmap GitHub repo at the
-tag matching the installed pycolmap version (never master), splits each
-into per-function/class records plus a module-context record, and writes
+Downloads the official example scripts from the GitHub repo configured in
+`config/config.py` (`EXAMPLES_GITHUB_REPO`/`EXAMPLES_PATH_IN_REPO`) at the
+tag matching the installed library version — never master, so example code
+can't drift ahead of the API records. Writes the `.py` files to
+`data/pycolmap_{version}_examples_src/` plus a `_manifest.json` recording
+each file's upstream URL, ref, and license. Test scaffolding
+(`conftest.py`, `*_test.py`) is skipped. Downloading only — a source that
+needs a different acquisition method gets its own `fetch_*` script writing
+the same directory layout.
+
+```bash
+python src/parse_library/parse_python_code.py
+```
+Reads `.py` files from that directory (never the network) and splits each
+into per-function/class records plus a module-context record, writing
 `data/pycolmap_{version}_examples.jsonl` — a separate file, so
-`parse_api.py`'s rebuild can't wipe it. Every `pycolmap.*` reference in
-the code is statically resolved against the API records into `apis_used`;
-unresolvable references land in `unknown_refs` (zero for the official
-examples — that's the version-alignment check working). Test scaffolding
-(`conftest.py`, `*_test.py`) is skipped.
+`parse_api.py`'s rebuild can't wipe it. Every reference to the target
+library is statically resolved via `ast` against the API records into
+`apis_used`; unresolvable ones land in `unknown_refs` (zero for the
+official examples — that's the version-alignment check working). `ast`
+never executes the code, which is what makes it safe over downloaded
+sources; the tradeoff is that dynamic references (`getattr(lib, name)`)
+are invisible, so `apis_used` is a conservative lower bound. Python only —
+other languages would need a sibling `parse_<language>_code.py`.
 
 ```bash
 python src/parse_library/parse_explanations.py
