@@ -139,14 +139,17 @@ def build_file_records(filename, source_text, module_name, known_names, name_pre
         code = "\n".join(lines[start - 1:end])
         records.append(make_record(f"{name_prefix}/{filename}::{node.name}", code, node, start, end))
 
+    # The module-context record stands for the file as a whole, so its
+    # apis_used is scanned over the entire tree, not just the leftover
+    # lines its code field holds. Scanning only those lines yields nothing
+    # useful: imports and an `if __name__` call site contain no attribute
+    # accesses to resolve, so every such record came out with an empty
+    # apis_used while the file plainly used the library throughout.
     context_code = "\n".join(
         line for i, line in enumerate(lines, 1) if i not in covered
     ).strip()
     if context_code:
-        context_nodes = ast.Module(
-            body=[n for n in tree.body if segment_start_line(n) not in covered], type_ignores=[]
-        )
-        records.append(make_record(f"{name_prefix}/{filename}", context_code, context_nodes, 1, len(lines)))
+        records.append(make_record(f"{name_prefix}/{filename}", context_code, tree, 1, len(lines)))
     return records
 
 
