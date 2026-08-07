@@ -9,7 +9,7 @@ library.
 Output (`data/` is gitignored - everything in it is generated locally):
 - `data/pycolmap_{version}_api.jsonl` — one record per API.
 - `data/pycolmap_{version}_examples.jsonl` — official example code split into per-function records.
-- `data/pycolmap_{version}_chunks.jsonl` — that data split into embedding chunks (text only, no vectors).
+- `data/pycolmap_{version}_api_chunks.jsonl` / `..._examples_chunks.jsonl` — that data split into embedding chunks, one chunk file per record file (text only, no vectors).
 - `data/chroma/` — a persistent Chroma DB holding each chunk's text, metadata, and embedding vector.
 
 ## 1. Environment setup
@@ -98,8 +98,11 @@ embedding chunks — currently an `explanation` chunk (name + official
 docstring text + generated explanation), a `signature` chunk (name +
 signatures + parameter names), and an `example` chunk (name + APIs used +
 code) — so conceptual, precise/parameter-level, and how-do-I-use-it
-queries can each match a chunk suited to that style. Writes
-`data/pycolmap_{version}_chunks.jsonl`. Chunks only carry
+queries can each match a chunk suited to that style. Each record file gets
+its own paired chunk file, name derived automatically
+(`..._api.jsonl` → `..._api_chunks.jsonl`, `..._examples.jsonl` →
+`..._examples_chunks.jsonl`), so different data sources stay separate and
+a future record source needs no config change. Chunks only carry
 `record_id`/`chunk_type`/`text`; the full record is looked up by
 `record_id` in the record jsonls once a chunk matches, not duplicated
 here. Which fields compose each chunk_type is a declarative recipe
@@ -109,9 +112,10 @@ built from existing fields need only a config edit.
 ```bash
 python src/rag_ingest/load_vectordb.py
 ```
-Calls a local OpenAI-compatible embeddings endpoint (`EMBEDDING_BASE_URL`/
-`EMBEDDING_MODEL` in `config/config.py`, defaults to the same server as
-`LLM_BASE_URL` with model `BAAI/bge-m3`) per chunk and loads the resulting
+Reads every chunk file that exists, calls a local OpenAI-compatible
+embeddings endpoint (`EMBEDDING_BASE_URL`/`EMBEDDING_MODEL` in
+`config/config.py`, defaults to the same server as `LLM_BASE_URL` with
+model `BAAI/bge-m3`) per chunk and loads the resulting
 vector straight into a Chroma collection at `data/chroma/` (one collection
 per pycolmap version, named via `chroma_collection_name()`, created with
 `hnsw:space` set to `CHROMA_DISTANCE_METRIC` — `cosine` by default, matching

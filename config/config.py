@@ -39,8 +39,16 @@ def record_jsonl_paths(version):
     return [api_jsonl_path(version), examples_jsonl_path(version)]
 
 
-def chunks_jsonl_path(version):
-    return DATA_DIR / f"{parsed_module_name}_{version}_chunks.jsonl"
+def chunks_jsonl_path_for(record_jsonl_path):
+    """The chunk file paired with a record file, derived from its name:
+    ..._api.jsonl -> ..._api_chunks.jsonl. A future record source gets its
+    own chunk file automatically, no config edit needed."""
+    return record_jsonl_path.with_name(record_jsonl_path.stem + "_chunks.jsonl")
+
+
+def chunk_jsonl_paths(version):
+    """All chunk files. Consumers (load_vectordb) iterate whichever exist."""
+    return [chunks_jsonl_path_for(p) for p in record_jsonl_paths(version)]
 
 
 CHROMA_DIR = DATA_DIR / "chroma"

@@ -27,7 +27,7 @@ from config import (
     EMBEDDING_MODEL,
     LLM_VERIFY_SSL,
     chroma_collection_name,
-    chunks_jsonl_path,
+    chunk_jsonl_paths,
     load_llm_api_key,
 )
 
@@ -128,7 +128,14 @@ def load_chunks(collection, chunks, api_key):
 def main():
     import pycolmap
 
-    chunks = read_jsonl(chunks_jsonl_path(pycolmap.__version__))
+    chunks = []
+    for path in chunk_jsonl_paths(pycolmap.__version__):
+        if path.exists():
+            file_chunks = read_jsonl(path)
+            chunks.extend(file_chunks)
+            print(f"Read {len(file_chunks)} chunks from {path.name}")
+        else:
+            print(f"Skipping {path} (not generated yet)")
     api_key = load_llm_api_key()
 
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
