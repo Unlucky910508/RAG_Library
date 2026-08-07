@@ -1,12 +1,14 @@
-# RAG_data_creater
+# RAG_Library
 
 Builds a JSONL RAG dataset describing the PyColmap Python API (name, kind,
 signatures, required/optional parameters, and an LLM-generated explanation
-per entry), so a local LLM/agent can look up API details instead of relying
-on its own possibly-wrong memory of the library.
+per entry) plus official example code, so a local LLM/agent can look up
+API details instead of relying on its own possibly-wrong memory of the
+library.
 
 Output (`data/` is gitignored - everything in it is generated locally):
 - `data/pycolmap_{version}_api.jsonl` — one record per API.
+- `data/pycolmap_{version}_examples.jsonl` — official example code split into per-function records.
 - `data/pycolmap_{version}_chunks.jsonl` — that data split into embedding chunks (text only, no vectors).
 - `data/chroma/` — a persistent Chroma DB holding each chunk's text, metadata, and embedding vector.
 
@@ -66,25 +68,40 @@ so it's safe to re-run on an already-explained dataset to pick up new
 fields. Only `parse_api.py` rebuilds the file from scratch.
 
 ```bash
+python src/parse_library/parse_examples.py
+```
+Fetches the official example scripts from the colmap GitHub repo at the
+tag matching the installed pycolmap version (never master), splits each
+into per-function/class records plus a module-context record, and writes
+`data/pycolmap_{version}_examples.jsonl` — a separate file, so
+`parse_api.py`'s rebuild can't wipe it. Every `pycolmap.*` reference in
+the code is statically resolved against the API records into `apis_used`;
+unresolvable references land in `unknown_refs` (zero for the official
+examples — that's the version-alignment check working). Test scaffolding
+(`conftest.py`, `*_test.py`) is skipped.
+
+```bash
 python src/parse_library/parse_explanations.py
 ```
 Calls the local LLM configured in step 2 to generate a short,
-retrieval-friendly explanation per record, grounded only in that record's
-own fields. Resumable — safe to re-run if interrupted, already-explained
-records are skipped.
+retrieval-friendly explanation per record — API records and example
+records both — grounded only in that record's own fields. Resumable —
+safe to re-run if interrupted, already-explained records are skipped.
 
 ### Phase 2 — into the RAG store (`src/rag_ingest/`)
 
 ```bash
 python src/rag_ingest/parse_chunks.py
 ```
-Splits each record into one or more embedding chunks — currently an
-`explanation` chunk (name + official docstring text + generated
-explanation) and a `signature` chunk (name + signatures + parameter
-names) — so conceptual and precise/parameter-level queries can each match
-a chunk suited to that style. Writes `data/pycolmap_{version}_chunks.jsonl`.
-Chunks only carry `record_id`/`chunk_type`/`text`; the full record is looked
-up by `record_id` in the API jsonl once a chunk matches, not duplicated
+Splits each record (from every record file that exists) into one or more
+embedding chunks — currently an `explanation` chunk (name + official
+docstring text + generated explanation), a `signature` chunk (name +
+signatures + parameter names), and an `example` chunk (name + APIs used +
+code) — so conceptual, precise/parameter-level, and how-do-I-use-it
+queries can each match a chunk suited to that style. Writes
+`data/pycolmap_{version}_chunks.jsonl`. Chunks only carry
+`record_id`/`chunk_type`/`text`; the full record is looked up by
+`record_id` in the record jsonls once a chunk matches, not duplicated
 here. Which fields compose each chunk_type is a declarative recipe
 (`CHUNK_FIELDS` in `config/config.py`), not code — new chunk types
 built from existing fields need only a config edit.
