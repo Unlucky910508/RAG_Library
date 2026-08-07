@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from config import CHUNK_FIELDS, chunks_jsonl_path_for, record_jsonl_paths
+from config import CHUNK_FIELDS, record_jsonl_paths
 
 
 def read_jsonl(path):
@@ -116,6 +116,10 @@ def build_chunks(record):
     return chunks
 
 
+def chunks_output_path(record_path):
+    return record_path.with_name(record_path.stem + "_chunks.jsonl")
+
+
 def main():
     import pycolmap
 
@@ -127,7 +131,7 @@ def main():
         chunks = []
         for record in records:
             chunks.extend(build_chunks(record))
-        output_path = chunks_jsonl_path_for(record_path)
+        output_path = chunks_output_path(record_path)
         write_jsonl(chunks, output_path)
         print(f"Wrote {len(chunks)} chunks from {len(records)} records to {output_path}")
 

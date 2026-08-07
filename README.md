@@ -99,10 +99,10 @@ docstring text + generated explanation), a `signature` chunk (name +
 signatures + parameter names), and an `example` chunk (name + APIs used +
 code) — so conceptual, precise/parameter-level, and how-do-I-use-it
 queries can each match a chunk suited to that style. Each record file gets
-its own paired chunk file, name derived automatically
+its own chunk file written next to it
 (`..._api.jsonl` → `..._api_chunks.jsonl`, `..._examples.jsonl` →
-`..._examples_chunks.jsonl`), so different data sources stay separate and
-a future record source needs no config change. Chunks only carry
+`..._examples_chunks.jsonl`), so different data sources stay separate.
+Chunks only carry
 `record_id`/`chunk_type`/`text`; the full record is looked up by
 `record_id` in the record jsonls once a chunk matches, not duplicated
 here. Which fields compose each chunk_type is a declarative recipe
@@ -112,10 +112,13 @@ built from existing fields need only a config edit.
 ```bash
 python src/rag_ingest/load_vectordb.py
 ```
-Reads every chunk file that exists, calls a local OpenAI-compatible
-embeddings endpoint (`EMBEDDING_BASE_URL`/`EMBEDDING_MODEL` in
-`config/config.py`, defaults to the same server as `LLM_BASE_URL` with
-model `BAAI/bge-m3`) per chunk and loads the resulting
+Reads every chunk file listed in `chunk_jsonl_paths()` in
+`config/config.py` (an explicit list — the format contract is just
+`{record_id, chunk_type, text}` per line, so any conforming jsonl can be
+added there, not only ones produced by `parse_chunks.py`), calls a local
+OpenAI-compatible embeddings endpoint (`EMBEDDING_BASE_URL`/
+`EMBEDDING_MODEL` in `config/config.py`, defaults to the same server as
+`LLM_BASE_URL` with model `BAAI/bge-m3`) per chunk and loads the resulting
 vector straight into a Chroma collection at `data/chroma/` (one collection
 per pycolmap version, named via `chroma_collection_name()`, created with
 `hnsw:space` set to `CHROMA_DISTANCE_METRIC` — `cosine` by default, matching
