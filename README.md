@@ -183,10 +183,38 @@ instead of silently staying stale. Same retry/incremental-flush design as
 Scripts must be run by file path (`python src/<folder>/<script>.py`), not
 as a module (`-m`) — there is no `__init__.py` under `src/`.
 
-## 4. Notes
+## 4. Refreshing stale explanations
+
+Explanations are generated from whatever fields a record had at the time,
+so when an enricher starts emitting a new field, explanations written
+before that were produced without it. `parse_explanations.py` skips
+records that already have one, so they won't refresh on their own — and
+deleting the jsonl to force it would regenerate every record, not just
+the affected ones.
+
+`invalidate_explanations.py` clears them selectively instead: name the
+fields whose arrival makes an explanation stale, and only records
+carrying one of them are reset. The next `parse_explanations.py` run then
+regenerates exactly those.
+
+```bash
+# preview first - writes nothing
+python src/parse_library/invalidate_explanations.py data/pycolmap_4.1.0_api.jsonl --when-field doc --dry-run
+
+# clear, then regenerate
+python src/parse_library/invalidate_explanations.py data/pycolmap_4.1.0_api.jsonl --when-field doc
+python src/parse_library/parse_explanations.py
+```
+
+Use `--all` instead of `--when-field` when the prompt itself changed, so
+every record's output is stale. Afterwards re-run `parse_chunks.py` and
+`load_vectordb.py`; the latter's `text_hash` check re-embeds only the
+chunks whose text actually changed.
+
+## 5. Notes
 
 - Target library name / output path / LLM settings are centralized in
-  `config/config.py` so the three scripts never drift out of sync.
+  `config/config.py` so the pipeline steps never drift out of sync.
 - Known gaps and open issues are tracked locally in `KNOWN_ISSUES.md`
   (gitignored, not part of this repo's public history).
 
