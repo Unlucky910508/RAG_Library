@@ -100,9 +100,12 @@ other languages would need a sibling `parse_<language>_code.py`.
 python src/parse_library/parse_explanations.py
 ```
 Calls the local LLM configured in step 2 to generate a short,
-retrieval-friendly explanation per record — API records and example
-records both — grounded only in that record's own fields. Resumable —
-safe to re-run if interrupted, already-explained records are skipped.
+retrieval-friendly explanation per record, grounded only in that record's
+own fields. API records and example records get different prompts:
+describing what an introspected API is and describing what a snippet
+accomplishes are different jobs. Example code is passed as a raw block
+rather than JSON-escaped. Resumable — safe to re-run if interrupted,
+already-explained records are skipped.
 
 ### Phase 2 — into the RAG store (`src/rag_ingest/`)
 
