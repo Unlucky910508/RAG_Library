@@ -47,10 +47,16 @@ EXAMPLE_SYSTEM_PROMPT = (
     "along with the library APIs it references. Write what a developer "
     "searching for this would want to match on: the task the code "
     "accomplishes and how it uses those APIs, not a line-by-line "
-    "paraphrase. Describe only what is actually in the snippet you are "
-    "shown - if it is just imports and an entry point, say that it is the "
-    "file's setup and note what the file as a whole works with, rather "
-    "than describing work the snippet does not contain. "
+    "paraphrase. "
+    "Base your explanation on the executable code, not on its docstring or "
+    "comments. Those may be out of date or describe the wider file rather "
+    "than this snippet, so treat them as supporting hints only: you may "
+    "draw on them, but every explanation must account for what the code "
+    "itself actually does. "
+    "Describe only what is actually in the snippet you are shown - if it "
+    "is just imports and an entry point, say that it is the file's setup "
+    "and note what the file as a whole works with, rather than describing "
+    "work the snippet does not contain. "
     + GROUNDING_RULE
 )
 
