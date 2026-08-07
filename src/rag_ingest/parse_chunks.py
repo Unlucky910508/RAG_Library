@@ -9,11 +9,11 @@ API jsonl and is looked up by record_id after a chunk matches, so nothing
 is duplicated here.
 
 Which fields make up which chunk_type is a data-only recipe
-(CHUNK_FIELDS in config/config.py), not code: FIELD_EXTRACTORS below
-is the one-function-per-JSON-field vocabulary the recipe draws from, and
-build_chunk_text() just looks up and concatenates whichever ones a given
-chunk_type lists. Adding or reshaping a chunk_type out of existing fields
-is a config edit; only a genuinely new field needs a new extractor here.
+(CHUNK_FIELDS in config/config.py), not code - this step reads each
+chunk_type's embedding_fields and renders them through the shared
+vocabulary in src/common/record_fields.py. The same recipe's
+return_fields are used at the other end of the pipeline by search.py,
+which is why that vocabulary is shared rather than local.
 """
 
 import json
@@ -22,6 +22,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
 from config import CHUNK_FIELDS, chunks_jsonl_path_for, record_jsonl_paths
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "common"))
+from record_fields import build_text, has_required_fields
 
 
 def read_jsonl(path):
@@ -35,82 +38,12 @@ def write_jsonl(records, path):
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
-def extract_name(record):
-    return record.get("name")
-
-
-def extract_kind(record):
-    return record.get("kind")
-
-
-def extract_explanation(record):
-    return record.get("explanation")
-
-
-def extract_doc(record):
-    return record.get("doc")
-
-
-def extract_code(record):
-    return record.get("code")
-
-
-def extract_apis_used(record):
-    apis = record.get("apis_used")
-    return "uses: " + ", ".join(apis) if apis else None
-
-
-def extract_signatures(record):
-    signatures = record.get("signatures")
-    return "\n".join(signatures) if signatures else None
-
-
-def extract_parameter_names(record):
-    names = sorted({p["name"] for overload in record.get("parameters", []) for p in overload})
-    return "parameters: " + ", ".join(names) if names else None
-
-
-def extract_enum_members(record):
-    members = record.get("members")
-    return "members: " + ", ".join(m["name"] for m in members) if members else None
-
-
-def extract_enum_of(record):
-    enum_of = record.get("enum_of")
-    return f"belongs to enum: {enum_of}" if enum_of else None
-
-
-def extract_value(record):
-    return f"value: {record['value']}" if "value" in record else None
-
-
-FIELD_EXTRACTORS = {
-    "name": extract_name,
-    "kind": extract_kind,
-    "explanation": extract_explanation,
-    "doc": extract_doc,
-    "code": extract_code,
-    "apis_used": extract_apis_used,
-    "signatures": extract_signatures,
-    "parameter_names": extract_parameter_names,
-    "enum_members": extract_enum_members,
-    "enum_of": extract_enum_of,
-    "value": extract_value,
-}
-
-
-def build_chunk_text(record, field_keys):
-    parts = [FIELD_EXTRACTORS[key](record) for key in field_keys]
-    parts = [p for p in parts if p]
-    return "\n".join(parts) if parts else None
-
-
 def build_chunks(record):
     chunks = []
     for chunk_type, spec in CHUNK_FIELDS.items():
-        if any(not FIELD_EXTRACTORS[key](record) for key in spec["required"]):
+        if not has_required_fields(record, spec["required"]):
             continue
-        text = build_chunk_text(record, spec["fields"])
+        text = build_text(record, spec["embedding_fields"])
         if text:
             chunks.append({"record_id": record["name"], "chunk_type": chunk_type, "text": text})
     return chunks

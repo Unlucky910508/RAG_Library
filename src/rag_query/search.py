@@ -1,5 +1,10 @@
 """Core RAG search logic: embed a query, look it up in the Chroma
-collection, and resolve each hit back to its full API record.
+collection, and resolve each hit back to its record.
+
+What comes back is assembled here from the matched chunk_type's
+return_fields (config.CHUNK_FIELDS), not read out of the vector DB - so a
+chunk can be matched on one kind of text and answered with another, and
+editing a recipe takes effect on the next query without re-embedding.
 
 Kept free of any MCP dependency so it's importable by anything - an MCP
 server, a CLI, a test script, a future different kind of RAG consumer.
@@ -16,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config")
 from config import (
     CHROMA_DIR,
     CHROMA_DISTANCE_METRIC,
+    CHUNK_FIELDS,
     EMBEDDING_BASE_URL,
     EMBEDDING_MODEL,
     LLM_VERIFY_SSL,
@@ -23,6 +29,9 @@ from config import (
     load_llm_api_key,
     record_jsonl_paths,
 )
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "common"))
+from record_fields import build_text
 
 if not LLM_VERIFY_SSL:
     requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
@@ -71,6 +80,17 @@ def embed_query(text, api_key):
     return response.json()["data"][0]["embedding"]
 
 
+def build_return_text(record, chunk_type):
+    """Render the record through the matched chunk_type's return_fields.
+    Falls back to the embedding_fields if a recipe defines no return of
+    its own, so a half-configured chunk_type still answers with something."""
+    if record is None:
+        return None
+    spec = CHUNK_FIELDS.get(chunk_type, {})
+    field_keys = spec.get("return_fields") or spec.get("embedding_fields", [])
+    return build_text(record, field_keys)
+
+
 def search(query, collection, records_by_id, api_key, top_k=5):
     query_embedding = embed_query(query, api_key)
     results = collection.query(query_embeddings=[query_embedding], n_results=top_k * OVERFETCH_MULTIPLIER)
@@ -82,11 +102,12 @@ def search(query, collection, records_by_id, api_key, top_k=5):
         if record_id in seen_record_ids:
             continue
         seen_record_ids.add(record_id)
+        chunk_type = metadata["chunk_type"]
         hits.append({
             "record_id": record_id,
-            "matched_chunk_type": metadata["chunk_type"],
+            "matched_chunk_type": chunk_type,
             "distance": distance,
-            "record": records_by_id.get(record_id),
+            "text": build_return_text(records_by_id.get(record_id), chunk_type),
         })
         if len(hits) == top_k:
             break

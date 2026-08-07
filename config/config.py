@@ -70,25 +70,39 @@ def chroma_collection_name(version):
     return f"{parsed_module_name}_{version}"
 
 
-# Recipe for parse_chunks.py: each chunk_type is built by looking up and
-# concatenating "fields" (see FIELD_EXTRACTORS in parse_chunks.py) in
-# order. "required" lists which of those fields must actually be present
-# on a record for this chunk_type to exist at all - e.g. a class with no
-# signatures shouldn't get an empty "signature" chunk just because it has
-# a name. Add/edit chunk types here without touching any code, as long as
-# the field extractors you list already exist.
+# Recipe per chunk_type. All three lists name fields from
+# FIELD_EXTRACTORS in src/common/record_fields.py; recombining existing
+# fields is a config edit, only a genuinely new field needs code.
+#
+#   embedding_fields - concatenated into the text that gets embedded and
+#                      matched against queries (parse_chunks.py)
+#   required         - fields a record must actually have for this
+#                      chunk_type to exist at all, so e.g. a class with no
+#                      signatures gets no "signature" chunk just because
+#                      it has a name
+#   return_fields    - concatenated into the text handed back to the
+#                      caller on a hit (search.py). Assembled at query
+#                      time, so editing this takes effect immediately
+#                      without re-embedding anything.
+#
+# Splitting the two lists means a chunk can be *found* by one kind of text
+# and *answered* with another - e.g. match on a prose explanation but hand
+# back the source code.
 CHUNK_FIELDS = {
     "explanation": {
-        "fields": ["name", "doc", "explanation"],
+        "embedding_fields": ["name", "doc", "explanation"],
         "required": ["explanation"],
+        "return_fields": ["name", "kind", "signatures", "parameter_names", "doc", "explanation"],
     },
     "signature": {
-        "fields": ["name", "signatures", "parameter_names"],
+        "embedding_fields": ["name", "signatures", "parameter_names"],
         "required": ["signatures"],
+        "return_fields": ["name", "kind", "signatures", "parameter_names", "doc", "explanation"],
     },
     "example": {
-        "fields": ["name", "apis_used", "code"],
+        "embedding_fields": ["name", "apis_used", "code"],
         "required": ["code"],
+        "return_fields": ["name", "source", "apis_used", "code"],
     },
 }
 
