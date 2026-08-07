@@ -21,7 +21,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from config import CHUNK_FIELDS, api_jsonl_path, chunks_jsonl_path
+from config import CHUNK_FIELDS, chunks_jsonl_path, record_jsonl_paths
 
 
 def read_jsonl(path):
@@ -49,6 +49,15 @@ def extract_explanation(record):
 
 def extract_doc(record):
     return record.get("doc")
+
+
+def extract_code(record):
+    return record.get("code")
+
+
+def extract_apis_used(record):
+    apis = record.get("apis_used")
+    return "uses: " + ", ".join(apis) if apis else None
 
 
 def extract_signatures(record):
@@ -80,6 +89,8 @@ FIELD_EXTRACTORS = {
     "kind": extract_kind,
     "explanation": extract_explanation,
     "doc": extract_doc,
+    "code": extract_code,
+    "apis_used": extract_apis_used,
     "signatures": extract_signatures,
     "parameter_names": extract_parameter_names,
     "enum_members": extract_enum_members,
@@ -108,7 +119,12 @@ def build_chunks(record):
 def main():
     import pycolmap
 
-    records = read_jsonl(api_jsonl_path(pycolmap.__version__))
+    records = []
+    for path in record_jsonl_paths(pycolmap.__version__):
+        if path.exists():
+            records.extend(read_jsonl(path))
+        else:
+            print(f"Skipping {path} (not generated yet)")
 
     chunks = []
     for record in records:

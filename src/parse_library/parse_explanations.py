@@ -15,19 +15,21 @@ from pathlib import Path
 import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from config import LLM_BASE_URL, LLM_MODEL, LLM_VERIFY_SSL, api_jsonl_path, load_llm_api_key
+from config import LLM_BASE_URL, LLM_MODEL, LLM_VERIFY_SSL, load_llm_api_key, record_jsonl_paths
 
 if not LLM_VERIFY_SSL:
     requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
 SYSTEM_PROMPT = (
     "You write short, retrieval-friendly explanations for a RAG database of "
-    "a Python library's API. You will be given one API's metadata as JSON, "
-    "extracted directly from the installed package via introspection - this "
-    "is the ONLY information you may use. Do not add facts you recall about "
-    "this library from your own training. If the given data is sparse, write "
-    "a short, accurate sentence instead of guessing at missing details. "
-    "Output 1-3 plain sentences, no markdown, no headers."
+    "a Python library's API. You will be given one record as JSON - either "
+    "an API's metadata extracted from the installed package via "
+    "introspection, or an official example code snippet - and this is the "
+    "ONLY information you may use. Do not add facts you recall about this "
+    "library from your own training. If the given data is sparse, write a "
+    "short, accurate sentence instead of guessing at missing details. For "
+    "code snippets, describe what the code does and which APIs it "
+    "demonstrates. Output 1-3 plain sentences, no markdown, no headers."
 )
 SAVE_EVERY = 20
 MAX_RETRIES = 3
@@ -103,12 +105,15 @@ def enrich_with_explanations(records, api_key, path):
 def main():
     import pycolmap
 
-    path = api_jsonl_path(pycolmap.__version__)
     api_key = load_llm_api_key()
 
-    records = read_jsonl(path)
-    enrich_with_explanations(records, api_key, path)
-    print(f"Done. Wrote explanations to {path}")
+    for path in record_jsonl_paths(pycolmap.__version__):
+        if not path.exists():
+            print(f"Skipping {path} (not generated yet)")
+            continue
+        records = read_jsonl(path)
+        enrich_with_explanations(records, api_key, path)
+        print(f"Done. Wrote explanations to {path}")
 
 
 if __name__ == "__main__":

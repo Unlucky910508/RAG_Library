@@ -19,9 +19,9 @@ from config import (
     EMBEDDING_BASE_URL,
     EMBEDDING_MODEL,
     LLM_VERIFY_SSL,
-    api_jsonl_path,
     chroma_collection_name,
     load_llm_api_key,
+    record_jsonl_paths,
 )
 
 if not LLM_VERIFY_SSL:
@@ -39,7 +39,12 @@ def read_jsonl(path):
 
 
 def load_records_by_id(version):
-    return {r["name"]: r for r in read_jsonl(api_jsonl_path(version))}
+    records_by_id = {}
+    for path in record_jsonl_paths(version):
+        if path.exists():
+            for record in read_jsonl(path):
+                records_by_id[record["name"]] = record
+    return records_by_id
 
 
 def get_collection(version):

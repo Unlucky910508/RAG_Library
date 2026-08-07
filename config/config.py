@@ -17,8 +17,26 @@ EMBEDDING_BASE_URL = LLM_BASE_URL
 EMBEDDING_MODEL = "BAAI/bge-m3"
 
 
+# Where the official example scripts live: the tag matching the installed
+# pycolmap version is fetched, never master, so the code can't drift ahead
+# of the API records.
+EXAMPLES_GITHUB_REPO = "colmap/colmap"
+EXAMPLES_PATH_IN_REPO = "python/examples"
+EXAMPLES_LICENSE = "BSD-3-Clause (COLMAP)"
+
+
 def api_jsonl_path(version):
     return DATA_DIR / f"{parsed_module_name}_{version}_api.jsonl"
+
+
+def examples_jsonl_path(version):
+    return DATA_DIR / f"{parsed_module_name}_{version}_examples.jsonl"
+
+
+def record_jsonl_paths(version):
+    """All record files that make up the dataset. Downstream steps
+    (explanations, chunking, search) iterate whichever of these exist."""
+    return [api_jsonl_path(version), examples_jsonl_path(version)]
 
 
 def chunks_jsonl_path(version):
@@ -52,6 +70,10 @@ CHUNK_FIELDS = {
     "signature": {
         "fields": ["name", "signatures", "parameter_names"],
         "required": ["signatures"],
+    },
+    "example": {
+        "fields": ["name", "apis_used", "code"],
+        "required": ["code"],
     },
 }
 
