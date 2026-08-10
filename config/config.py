@@ -24,12 +24,47 @@ EXAMPLES_GITHUB_REPO = "colmap/colmap"
 EXAMPLES_PATH_IN_REPO = "python/examples"
 EXAMPLES_LICENSE = "BSD-3-Clause (COLMAP)"
 # Downloaded .py files land here, with a _manifest.json recording where
-# each came from. parse_code.py reads this directory; it never downloads.
+# each came from. parse_python_code.py reads this directory; it never
+# downloads.
 EXAMPLES_MANIFEST_NAME = "_manifest.json"
 
 
 def examples_src_dir(version):
     return DATA_DIR / f"{parsed_module_name}_{version}_examples_src"
+
+
+# Discovery of community code that uses this library, for
+# discover_community_code.py. That script only inventories candidates -
+# nothing it finds enters the dataset without being reviewed first.
+#
+# Trust here is not taken from stars or reputation: those are only coarse
+# prefilters to keep the candidate set small. The decisive test is the static
+# one the pipeline already does - resolving every reference against the
+# API records of the installed version.
+COMMUNITY_LICENSE_ALLOWLIST = {
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "Apache-2.0",
+    "ISC",
+    "0BSD",
+    "Unlicense",
+}
+# GitHub reports NOASSERTION when it cannot match a repo's LICENSE to a
+# known one, which in practice often means a custom research-only grant.
+# Neither auto-accepted nor auto-dropped: flagged for a human to read.
+COMMUNITY_LICENSE_REVIEW = {"NOASSERTION"}
+COMMUNITY_MIN_STARS = 200
+COMMUNITY_MAX_AGE_DAYS = 730
+# A file has to actually exercise the library, not merely import it.
+COMMUNITY_MIN_APIS_PER_FILE = 4
+# Any reference that does not resolve against the installed version's API
+# records is evidence the file targets a different version.
+COMMUNITY_MAX_UNKNOWN_REFS = 0
+
+
+def community_candidates_path(version):
+    return DATA_DIR / f"{parsed_module_name}_{version}_community_candidates.jsonl"
 
 
 def api_jsonl_path(version):
