@@ -35,11 +35,21 @@ directly, e.g. `/path/to/envs/pycolmap/bin/python`).
 
 ## 2. LLM config (only needed for `parse_explanations.py` and `load_vectordb.py`)
 
-- Edit `config/config.py`:
-  - `LLM_BASE_URL` — your local OpenAI-compatible server, e.g. `http://localhost:8000/v1`
-  - `LLM_MODEL` — the model name your server expects
-- Create `config/key.txt` containing your API key on a single line.
-  This file is gitignored — it never gets committed.
+```bash
+cp config/AI_server_config.template.py config/AI_server_config.py
+```
+
+Then fill it in:
+- `LLM_BASE_URL` — your OpenAI-compatible server, e.g. `http://localhost:8000/v1`
+- `LLM_MODEL` — the model name your server expects
+- `API_KEY` — the key for that server
+- `EMBEDDING_BASE_URL` / `EMBEDDING_MODEL` — default to the same server, override if your
+  embedding model is hosted elsewhere
+
+`config/AI_server_config.py` is gitignored: your key stays local, and
+pulling a newer version of the pipeline never touches your settings or
+asks you to reconcile them. `config/config.py` re-exports everything from
+it, so scripts import it all from `config` either way.
 
 ## 3. Running the pipeline
 
