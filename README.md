@@ -96,6 +96,33 @@ sources; the tradeoff is that dynamic references (`getattr(lib, name)`)
 are invisible, so `apis_used` is a conservative lower bound. Python only —
 other languages would need a sibling `parse_<language>_code.py`.
 
+#### Optional: finding more example code
+
+The official examples are a small corpus. To see what third-party code
+uses the library:
+
+```bash
+python src/parse_library/discover_community_code.py
+```
+Searches grep.app for repositories importing the target library, adds
+licence and activity from GitHub's API, downloads the matching files and
+scores each one. No credentials needed for any of it.
+
+Stars and recency are only cheap prefilters. What decides a file is the
+same static check as above — every reference must resolve against the
+installed version's API records (`unknown_refs` must be empty), and the
+file must touch at least `COMMUNITY_MIN_APIS_PER_FILE` of them, since
+importing a library is not the same as demonstrating it. Thresholds and
+the licence allowlist live in `config/config.py`.
+
+This writes `data/pycolmap_{version}_community_candidates.jsonl` and
+stops there — **nothing enters the dataset from it**. Third-party code
+carries licence obligations and version risk worth a person's judgement
+before an agent starts quoting it. Note that GitHub's licence detection
+returns `NOASSERTION` fairly often, including for `colmap/colmap` itself
+whose `COPYING.txt` is plain BSD, so those are flagged for review rather
+than dropped.
+
 ```bash
 python src/parse_library/parse_explanations.py
 ```
