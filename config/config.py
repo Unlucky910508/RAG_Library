@@ -70,6 +70,13 @@ def chroma_collection_name(version):
     return f"{parsed_module_name}_{version}"
 
 
+# Ceiling on results per search. Each hit carries a full record's worth of
+# text, so a caller asking for many of them floods the agent's context
+# with loosely-related matches. Requests above this are clamped, not
+# rejected - an over-eager caller still gets an answer.
+MAX_TOP_K = 5
+
+
 # Recipe per chunk_type. All three lists name fields from
 # FIELD_EXTRACTORS in src/common/record_fields.py; recombining existing
 # fields is a config edit, only a genuinely new field needs code.

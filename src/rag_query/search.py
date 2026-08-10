@@ -25,6 +25,7 @@ from config import (
     EMBEDDING_BASE_URL,
     EMBEDDING_MODEL,
     LLM_VERIFY_SSL,
+    MAX_TOP_K,
     chroma_collection_name,
     load_llm_api_key,
     record_jsonl_paths,
@@ -91,7 +92,11 @@ def build_return_text(record, chunk_type):
     return build_text(record, field_keys)
 
 
-def search(query, collection, records_by_id, api_key, top_k=5):
+def search(query, collection, records_by_id, api_key, top_k=MAX_TOP_K):
+    # Clamped rather than rejected: callers are usually models, and an
+    # over-eager top_k should still get an answer. Enforced here rather
+    # than in the MCP layer so every consumer of this module is covered.
+    top_k = max(1, min(top_k, MAX_TOP_K))
     query_embedding = embed_query(query, api_key)
     results = collection.query(query_embeddings=[query_embedding], n_results=top_k * OVERFETCH_MULTIPLIER)
 
