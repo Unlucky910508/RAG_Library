@@ -72,15 +72,30 @@ fields. Only `parse_api.py` rebuilds the file from scratch.
 ```bash
 python src/parse_library/fetch_official_example_code.py
 ```
-Downloads the official example scripts from the GitHub repo configured in
-`config/config.py` (`EXAMPLES_GITHUB_REPO`/`EXAMPLES_PATH_IN_REPO`) at the
-tag matching the installed library version — never master, so example code
-can't drift ahead of the API records. Writes the `.py` files to
+Downloads the official example scripts at the tag matching the installed
+library version — never master, so example code can't drift ahead of the
+API records. Writes the `.py` files to
 `data/pycolmap_{version}_examples_src/` plus a `_manifest.json` recording
 each file's upstream URL, ref, and license. Test scaffolding
 (`conftest.py`, `*_test.py`) is skipped. Downloading only — a source that
 needs a different acquisition method gets its own `fetch_*` script writing
 the same directory layout.
+
+**Where those examples live is worked out, not configured.** The
+repository and licence come from the package's PyPI metadata, and the
+directory from scanning the repository tree for a conventionally named one
+(`examples/`, `samples/`, `demos/`, …) holding `.py` files. Tag lookup
+tries both `{version}` and `v{version}`, since projects differ. So
+retargeting the pipeline is still just `parsed_module_name`.
+
+`EXAMPLES_GITHUB_REPO`, `EXAMPLES_PATH_IN_REPO` and `EXAMPLES_LICENSE`
+default to `None`, meaning "work it out". Set any of them to decide it by
+hand — for examples kept somewhere unusual, a project not on PyPI, or a
+ref you want pinned. **Where resolution fails, the run stops and names the
+setting to fill in** rather than falling back to a default, since a wrong
+repository would quietly fill the dataset with another project's code.
+Each run prints what it settled on and whether that came from config or
+resolution.
 
 ```bash
 python src/parse_library/parse_python_code.py
