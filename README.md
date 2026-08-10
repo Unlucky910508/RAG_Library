@@ -90,11 +90,20 @@ into per-function/class records plus a module-context record, writing
 `parse_api.py`'s rebuild can't wipe it. Every reference to the target
 library is statically resolved via `ast` against the API records into
 `apis_used`; unresolvable ones land in `unknown_refs` (zero for the
-official examples — that's the version-alignment check working). `ast`
-never executes the code, which is what makes it safe over downloaded
-sources; the tradeoff is that dynamic references (`getattr(lib, name)`)
-are invisible, so `apis_used` is a conservative lower bound. Python only —
-other languages would need a sibling `parse_<language>_code.py`.
+official examples — that's the version-alignment check working).
+
+Functions and classes that never touch the target library are **left
+out** — argument parsers, plotting helpers, plain dataclasses. In a RAG
+built around one library they match nothing useful and only dilute
+retrieval, and the effect grows with file size. A helper supporting a
+workflow is lost along with them; the functions around it that do call
+the library still describe that workflow.
+
+`ast` never executes the code, which is what makes it safe over
+downloaded sources; the tradeoff is that dynamic references
+(`getattr(lib, name)`) are invisible, so `apis_used` is a conservative
+lower bound. Python only — other languages would need a sibling
+`parse_<language>_code.py`.
 
 #### Optional: finding more example code
 
