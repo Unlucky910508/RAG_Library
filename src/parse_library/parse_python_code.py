@@ -119,6 +119,15 @@ def build_file_records(filename, source_text, module_name, known_names, name_pre
 
     def make_record(name, code, refs_node, start, end):
         used, unknown = collect_api_refs(refs_node, aliases, known_names)
+        # A segment that never touches the library has nothing to offer a
+        # RAG built around it - argument parsers, plotting helpers, plain
+        # dataclasses. They are findable by nothing useful and would only
+        # dilute retrieval, so they are left out rather than stored with an
+        # empty apis_used. The cost is that a helper supporting a workflow
+        # goes with them; the surrounding functions that do call the
+        # library still describe that workflow.
+        if not used and not unknown:
+            return None
         record = {"name": name, "kind": "example"}
         if provenance.get("url"):
             record["source"] = f"{provenance['url']}#L{start}-L{end}"
@@ -135,9 +144,14 @@ def build_file_records(filename, source_text, module_name, known_names, name_pre
     covered = set()
     for node in segments:
         start, end = segment_start_line(node), node.end_lineno
+        # Claimed either way: a skipped segment's lines still belong to it,
+        # not to the module-context record, which would otherwise absorb
+        # whole unrelated functions into what should be imports and glue.
         covered.update(range(start, end + 1))
         code = "\n".join(lines[start - 1:end])
-        records.append(make_record(f"{name_prefix}/{filename}::{node.name}", code, node, start, end))
+        record = make_record(f"{name_prefix}/{filename}::{node.name}", code, node, start, end)
+        if record:
+            records.append(record)
 
     # The module-context record stands for the file as a whole, so its
     # apis_used is scanned over the entire tree, not just the leftover
@@ -149,7 +163,9 @@ def build_file_records(filename, source_text, module_name, known_names, name_pre
         line for i, line in enumerate(lines, 1) if i not in covered
     ).strip()
     if context_code:
-        records.append(make_record(f"{name_prefix}/{filename}", context_code, tree, 1, len(lines)))
+        record = make_record(f"{name_prefix}/{filename}", context_code, tree, 1, len(lines))
+        if record:
+            records.append(record)
     return records
 
 
