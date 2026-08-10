@@ -106,14 +106,25 @@ python src/parse_library/discover_community_code.py
 ```
 Searches grep.app for repositories importing the target library, adds
 licence and activity from GitHub's API, downloads the matching files and
-scores each one. No credentials needed for any of it.
+scores each one. No credentials needed. Optionally, a GitHub token in
+`config/github_token.txt` (gitignored, no scopes required) raises the API
+limit from 60 requests an hour to 5000 — useful when re-running while
+tuning the filters.
 
 Stars and recency are only cheap prefilters. What decides a file is the
 same static check as above — every reference must resolve against the
-installed version's API records (`unknown_refs` must be empty), and the
-file must touch at least `COMMUNITY_MIN_APIS_PER_FILE` of them, since
-importing a library is not the same as demonstrating it. Thresholds and
-the licence allowlist live in `config/config.py`.
+installed version's API records (`unknown_refs` must be empty) — plus
+density, measured **per function** rather than per file: a file passes if
+it holds at least one function using `COMMUNITY_MIN_APIS_PER_FUNCTION`
+distinct APIs. Per function, because a function is what
+`parse_python_code.py` turns into a record; counting across a whole file
+instead scores a 2000-line grab-bag the same as a focused one. Each
+candidate reports `qualifying_functions` and `max_apis_in_function` so
+you can see how much a file would actually yield. Thresholds and the
+licence allowlist live in `config/config.py`.
+
+Files that import the library without calling into it are left out
+entirely rather than listed with an empty `apis_used`.
 
 This writes `data/pycolmap_{version}_community_candidates.jsonl` and
 stops there — **nothing enters the dataset from it**. Third-party code
