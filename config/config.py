@@ -17,12 +17,38 @@ EMBEDDING_BASE_URL = LLM_BASE_URL
 EMBEDDING_MODEL = "BAAI/bge-m3"
 
 
-# Where the official example scripts live: the tag matching the installed
-# pycolmap version is fetched, never master, so the code can't drift ahead
-# of the API records.
-EXAMPLES_GITHUB_REPO = "colmap/colmap"
-EXAMPLES_PATH_IN_REPO = "python/examples"
-EXAMPLES_LICENSE = "BSD-3-Clause (COLMAP)"
+# Where the official example scripts live. Left as None, each is worked
+# out from the package itself - the repository and licence from its PyPI
+# metadata, the directory by looking through the repository for a
+# conventionally named one holding .py files - so pointing the pipeline at
+# another library is still only a change of parsed_module_name.
+#
+# Set any of them to take that decision by hand instead. Do that when the
+# fetch reports it could not work something out: it stops and says which
+# of these to fill in rather than guessing, since a wrong guess would
+# quietly fill the dataset with another project's code.
+#
+# What resolution finds for pycolmap, as a reference for the shape:
+#   EXAMPLES_GITHUB_REPO = "colmap/colmap"
+#   EXAMPLES_PATH_IN_REPO = "python/examples"
+#   EXAMPLES_LICENSE = "BSD-3-Clause"
+EXAMPLES_GITHUB_REPO = None
+EXAMPLES_PATH_IN_REPO = None
+EXAMPLES_LICENSE = None
+# Directory names a project might keep its examples under, tried in the
+# repository tree when EXAMPLES_PATH_IN_REPO is None.
+EXAMPLES_DIR_CONVENTIONS = (
+    "examples",
+    "example",
+    "samples",
+    "sample",
+    "demos",
+    "demo",
+    "tutorials",
+    "tutorial",
+    "cookbook",
+    "recipes",
+)
 # Downloaded .py files land here, with a _manifest.json recording where
 # each came from. parse_python_code.py reads this directory; it never
 # downloads.
