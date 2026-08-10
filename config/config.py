@@ -41,6 +41,18 @@ def examples_src_dir(version):
 # prefilters to keep the candidate set small. The decisive test is the static
 # one the pipeline already does - resolving every reference against the
 # API records of the installed version.
+# Optional. Without it GitHub allows 60 requests an hour, which covers a
+# run or so; with it, 5000. Needs no scopes at all - everything read here
+# is public - so a token restricted to public repositories is enough.
+GITHUB_TOKEN_FILE = Path(__file__).resolve().parent / "github_token.txt"
+
+
+def load_github_token():
+    if not GITHUB_TOKEN_FILE.exists():
+        return None
+    return GITHUB_TOKEN_FILE.read_text(encoding="utf-8").strip() or None
+
+
 COMMUNITY_LICENSE_ALLOWLIST = {
     "MIT",
     "BSD-2-Clause",
@@ -56,8 +68,14 @@ COMMUNITY_LICENSE_ALLOWLIST = {
 COMMUNITY_LICENSE_REVIEW = {"NOASSERTION"}
 COMMUNITY_MIN_STARS = 200
 COMMUNITY_MAX_AGE_DAYS = 730
-# A file has to actually exercise the library, not merely import it.
-COMMUNITY_MIN_APIS_PER_FILE = 4
+# Measured per function, because that is the unit parse_python_code.py
+# turns into a record: the question is whether a file contains at least
+# one function that would make a good one. Counting distinct APIs across a
+# whole file instead scores a 2100-line grab-bag touching seven APIs the
+# same as a 150-line function using eleven, and only the second is worth
+# quoting. Three distinct APIs in one function is enough to be showing
+# composition rather than a single call.
+COMMUNITY_MIN_APIS_PER_FUNCTION = 3
 # Any reference that does not resolve against the installed version's API
 # records is evidence the file targets a different version.
 COMMUNITY_MAX_UNKNOWN_REFS = 0

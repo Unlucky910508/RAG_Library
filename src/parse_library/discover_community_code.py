@@ -21,6 +21,12 @@ the pipeline already performs - resolving every reference against the API
 records of the *installed* version. A file that reaches for names this
 version does not have was written for a different one, and no amount of
 popularity makes it safe to quote.
+
+Density is measured per function rather than per file, since a function
+is what parse_python_code.py turns into a record. The question a file has
+to answer is whether it contains at least one function dense enough to be
+worth quoting - not whether its imports touch enough of the library
+somewhere across two thousand lines.
 """
 
 import ast
@@ -38,12 +44,13 @@ from config import (
     COMMUNITY_LICENSE_REVIEW,
     COMMUNITY_MAX_AGE_DAYS,
     COMMUNITY_MAX_UNKNOWN_REFS,
-    COMMUNITY_MIN_APIS_PER_FILE,
+    COMMUNITY_MIN_APIS_PER_FUNCTION,
     COMMUNITY_MIN_STARS,
     EXAMPLES_GITHUB_REPO,
     EXAMPLES_PATH_IN_REPO,
     api_jsonl_path,
     community_candidates_path,
+    load_github_token,
     parsed_module_name,
 )
 
@@ -95,8 +102,12 @@ def search_repos(module_name, pages=SEARCH_PAGES):
     return found
 
 
-def fetch_repo_metadata(repo):
-    response = requests.get(f"{GITHUB_REPO_API}/{repo}", timeout=30)
+def github_headers(token):
+    return {"Authorization": f"Bearer {token}"} if token else {}
+
+
+def fetch_repo_metadata(repo, token=None):
+    response = requests.get(f"{GITHUB_REPO_API}/{repo}", headers=github_headers(token), timeout=30)
     if not response.ok:
         return None
     data = response.json()
@@ -164,10 +175,21 @@ def score_file(source_text, module_name, known_names):
     used, unknown = collect_api_refs(tree, aliases, known_names)
     if not used:
         return None
+
+    # Scored per function, matching the unit parse_python_code.py records,
+    # so the file-level count stays as context while the decision rests on
+    # whether any single function is dense enough to be worth quoting.
+    per_function = [
+        len(collect_api_refs(node, aliases, known_names)[0])
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+    ]
     return {
         "apis_used": used,
         "unknown_refs": unknown,
         "lines": len(source_text.splitlines()),
+        "max_apis_in_function": max(per_function, default=0),
+        "qualifying_functions": sum(1 for n in per_function if n >= COMMUNITY_MIN_APIS_PER_FUNCTION),
     }
 
 
@@ -187,7 +209,7 @@ def evaluate_repo(repo, entry, meta, module_name, known_names):
         duplicate = already_ingested(repo, path)
         passes = (
             not duplicate
-            and len(score["apis_used"]) >= COMMUNITY_MIN_APIS_PER_FILE
+            and score["qualifying_functions"] >= 1
             and len(score["unknown_refs"]) <= COMMUNITY_MAX_UNKNOWN_REFS
         )
         candidates.append({
@@ -209,6 +231,8 @@ def evaluate_repo(repo, entry, meta, module_name, known_names):
 def main():
     version = __import__(parsed_module_name).__version__
     known_names = {r["name"] for r in read_jsonl(api_jsonl_path(version))}
+    token = load_github_token()
+    print(f"GitHub API: {'authenticated' if token else 'unauthenticated (60 requests/hour)'}")
 
     print(f"Searching grep.app for code importing {parsed_module_name}")
     repos = search_repos(parsed_module_name)
@@ -216,7 +240,7 @@ def main():
 
     candidates, import_only = [], 0
     for repo, entry in sorted(repos.items()):
-        meta = fetch_repo_metadata(repo)
+        meta = fetch_repo_metadata(repo, token)
         time.sleep(POLITE_DELAY)
         if meta is None:
             print(f"  skip {repo}: metadata unavailable (rate limited?)")
@@ -231,7 +255,7 @@ def main():
         print(f"  {repo}: {kept}/{len(found)} files pass ({meta['license']}, {meta['stars']} stars)")
         candidates.extend(found)
 
-    candidates.sort(key=lambda c: (not c["recommended"], -len(c["apis_used"])))
+    candidates.sort(key=lambda c: (not c["recommended"], -c["qualifying_functions"], -c["max_apis_in_function"]))
     output_path = community_candidates_path(version)
     write_jsonl(candidates, output_path)
 
@@ -240,7 +264,8 @@ def main():
     print(f"\nWrote {len(candidates)} candidates to {output_path}")
     if import_only:
         print(f"  ({import_only} files left out - they import the library without using it)")
-    print(f"  {len(recommended)} pass the static checks")
+    print(f"  {len(recommended)} pass the static checks, "
+          f"yielding {sum(c['qualifying_functions'] for c in recommended)} functions worth reviewing")
     if review:
         print(f"  {len(review)} of those carry an unrecognised licence - read it before using them")
     print("Nothing has been added to the dataset; review the file and decide.")
