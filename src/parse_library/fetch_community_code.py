@@ -1,12 +1,18 @@
-"""Inventory community code that uses the target library, for review.
+"""Find community code that uses the target library and keep what passes.
 
-Writes a candidates file and nothing else - no source enters the dataset
-on the strength of this script alone. Downloading whatever it approves is
-a separate, deliberate step, because code from arbitrary repositories
-carries licence obligations and version risk that a person should weigh
-before an agent starts quoting it as an example.
+Files have to be downloaded to be judged - the deciding test reads their
+source - so the ones that survive are simply written out rather than
+discarded and fetched again later. They land in the same directory layout
+fetch_official_example_code.py produces, so parse_python_code.py reads
+them the same way.
 
-The discovery chain needs no credentials:
+Downloading is not ingesting. Nothing here reaches the dataset until
+parse_python_code.py is run over the directory, which leaves room to read
+the candidates file and delete anything unwanted first - worth doing,
+since third-party code carries licence obligations and version risk a
+person should weigh before an agent starts quoting it.
+
+The chain needs no credentials:
 
     grep.app                  which repositories import this library
     api.github.com            licence, stars, last push (60 req/hour)
@@ -48,8 +54,10 @@ from config import (
     COMMUNITY_MIN_STARS,
     EXAMPLES_GITHUB_REPO,
     EXAMPLES_PATH_IN_REPO,
+    EXAMPLES_MANIFEST_NAME,
     api_jsonl_path,
     community_candidates_path,
+    community_src_dir,
     load_github_token,
     parsed_module_name,
 )
@@ -193,9 +201,15 @@ def score_file(source_text, module_name, known_names):
     }
 
 
-def evaluate_repo(repo, entry, meta, module_name, known_names):
-    """Returns (candidates, n_skipped). Skipped files are ones with no
-    library usage to review at all - see score_file."""
+def local_path_for(repo, path):
+    """Namespaced by repo, since basenames collide across projects - three
+    of them here are called colmap.py."""
+    return Path(repo.replace("/", "__")) / path
+
+
+def evaluate_repo(repo, entry, meta, module_name, known_names, dest_dir):
+    """Score each file, writing out the ones that pass. Returns
+    (candidates, n_skipped); skipped files have no library usage at all."""
     candidates, skipped = [], 0
     for path in sorted(entry["paths"]):
         source_text = fetch_file(repo, entry["branch"], path)
@@ -212,10 +226,16 @@ def evaluate_repo(repo, entry, meta, module_name, known_names):
             and score["qualifying_functions"] >= 1
             and len(score["unknown_refs"]) <= COMMUNITY_MAX_UNKNOWN_REFS
         )
+        relative = local_path_for(repo, path)
+        if passes:
+            out = dest_dir / relative
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_text(source_text, encoding="utf-8")
         candidates.append({
             "repo": repo,
             "path": path,
             "branch": entry["branch"],
+            "local_path": str(relative),
             "source": f"https://github.com/{repo}/blob/{entry['branch']}/{path}",
             "license": meta["license"],
             "license_verdict": licence_verdict(meta["license"]),
@@ -234,6 +254,9 @@ def main():
     token = load_github_token()
     print(f"GitHub API: {'authenticated' if token else 'unauthenticated (60 requests/hour)'}")
 
+    dest_dir = community_src_dir(version)
+    dest_dir.mkdir(parents=True, exist_ok=True)
+
     print(f"Searching grep.app for code importing {parsed_module_name}")
     repos = search_repos(parsed_module_name)
     print(f"  {len(repos)} repositories, {sum(len(e['paths']) for e in repos.values())} files\n")
@@ -249,26 +272,37 @@ def main():
         if reason:
             print(f"  skip {repo}: {reason}")
             continue
-        found, skipped = evaluate_repo(repo, entry, meta, parsed_module_name, known_names)
+        found, skipped = evaluate_repo(repo, entry, meta, parsed_module_name, known_names, dest_dir)
         import_only += skipped
         kept = sum(1 for c in found if c["recommended"])
-        print(f"  {repo}: {kept}/{len(found)} files pass ({meta['license']}, {meta['stars']} stars)")
+        print(f"  {repo}: {kept}/{len(found)} files kept ({meta['license']}, {meta['stars']} stars)")
         candidates.extend(found)
 
     candidates.sort(key=lambda c: (not c["recommended"], -c["qualifying_functions"], -c["max_apis_in_function"]))
-    output_path = community_candidates_path(version)
-    write_jsonl(candidates, output_path)
+    write_jsonl(candidates, community_candidates_path(version))
 
-    recommended = [c for c in candidates if c["recommended"]]
-    review = [c for c in recommended if c["license_verdict"] == "needs-review"]
-    print(f"\nWrote {len(candidates)} candidates to {output_path}")
+    kept = [c for c in candidates if c["recommended"]]
+    # Same manifest contract as the official fetcher, so parse_python_code
+    # can attribute a record without knowing where the code came from.
+    manifest = {
+        "source": "community",
+        "license": None,
+        "files": {c["local_path"]: c["source"] for c in kept},
+        "licenses": {c["local_path"]: c["license"] for c in kept},
+    }
+    (dest_dir / EXAMPLES_MANIFEST_NAME).write_text(
+        json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
+    )
+
+    review = [c for c in kept if c["license_verdict"] == "needs-review"]
+    print(f"\nKept {len(kept)} files in {dest_dir}, "
+          f"holding {sum(c['qualifying_functions'] for c in kept)} functions worth reviewing")
     if import_only:
-        print(f"  ({import_only} files left out - they import the library without using it)")
-    print(f"  {len(recommended)} pass the static checks, "
-          f"yielding {sum(c['qualifying_functions'] for c in recommended)} functions worth reviewing")
+        print(f"  ({import_only} files never used the library and were not downloaded)")
+    print(f"  decisions recorded in {community_candidates_path(version)}")
     if review:
-        print(f"  {len(review)} of those carry an unrecognised licence - read it before using them")
-    print("Nothing has been added to the dataset; review the file and decide.")
+        print(f"  {len(review)} carry an unrecognised licence - read it before keeping them")
+    print("Review the directory and delete anything unwanted, then run parse_python_code.py.")
 
 
 if __name__ == "__main__":

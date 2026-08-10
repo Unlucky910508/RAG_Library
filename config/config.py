@@ -33,14 +33,12 @@ def examples_src_dir(version):
     return DATA_DIR / f"{parsed_module_name}_{version}_examples_src"
 
 
-# Discovery of community code that uses this library, for
-# discover_community_code.py. That script only inventories candidates -
-# nothing it finds enters the dataset without being reviewed first.
-#
+# Community code that uses this library, for fetch_community_code.py.
 # Trust here is not taken from stars or reputation: those are only coarse
 # prefilters to keep the candidate set small. The decisive test is the static
 # one the pipeline already does - resolving every reference against the
 # API records of the installed version.
+#
 # Optional. Without it GitHub allows 60 requests an hour, which covers a
 # run or so; with it, 5000. Needs no scopes at all - everything read here
 # is public - so a token restricted to public repositories is enough.
@@ -82,7 +80,13 @@ COMMUNITY_MAX_UNKNOWN_REFS = 0
 
 
 def community_candidates_path(version):
+    """A record of what the fetch kept and what it turned away, written
+    alongside the sources so its decisions can be reviewed."""
     return DATA_DIR / f"{parsed_module_name}_{version}_community_candidates.jsonl"
+
+
+def community_src_dir(version):
+    return DATA_DIR / f"{parsed_module_name}_{version}_community_src"
 
 
 def api_jsonl_path(version):
@@ -93,10 +97,33 @@ def examples_jsonl_path(version):
     return DATA_DIR / f"{parsed_module_name}_{version}_examples.jsonl"
 
 
+def community_jsonl_path(version):
+    return DATA_DIR / f"{parsed_module_name}_{version}_community.jsonl"
+
+
+def code_sources(version):
+    """Directories of .py files parse_python_code.py turns into records,
+    each with the prefix its record names carry so a hit is traceable to
+    where the code came from. Add a source here once some fetch_* script
+    writes the same directory layout."""
+    return [
+        {
+            "src_dir": examples_src_dir(version),
+            "jsonl": examples_jsonl_path(version),
+            "name_prefix": "examples",
+        },
+        {
+            "src_dir": community_src_dir(version),
+            "jsonl": community_jsonl_path(version),
+            "name_prefix": "community",
+        },
+    ]
+
+
 def record_jsonl_paths(version):
     """All record files that make up the dataset. Downstream steps
     (explanations, chunking, search) iterate whichever of these exist."""
-    return [api_jsonl_path(version), examples_jsonl_path(version)]
+    return [api_jsonl_path(version)] + [s["jsonl"] for s in code_sources(version)]
 
 
 def chunks_jsonl_path_for(record_jsonl_path):

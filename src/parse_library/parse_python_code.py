@@ -32,8 +32,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config")
 from config import (
     EXAMPLES_MANIFEST_NAME,
     api_jsonl_path,
-    examples_jsonl_path,
-    examples_src_dir,
+    code_sources,
     parsed_module_name,
 )
 
@@ -178,36 +177,42 @@ def load_manifest(source_dir):
 
 def parse_source_dir(source_dir, module_name, known_names, name_prefix):
     manifest = load_manifest(source_dir)
-    urls, license_name = manifest.get("files", {}), manifest.get("license")
+    urls = manifest.get("files", {})
+    # One licence for the whole directory when every file came from the
+    # same repository, per-file when they did not.
+    licenses, shared_license = manifest.get("licenses", {}), manifest.get("license")
 
     records = []
-    for path in sorted(source_dir.glob("*.py")):
-        provenance = {"url": urls.get(path.name), "license": license_name}
+    # Recursive: sources drawn from several repositories are nested under a
+    # directory per repository, because basenames collide across projects.
+    for path in sorted(source_dir.rglob("*.py")):
+        key = str(path.relative_to(source_dir))
+        provenance = {"url": urls.get(key), "license": licenses.get(key, shared_license)}
         file_records = build_file_records(
-            path.name, path.read_text(encoding="utf-8"), module_name, known_names, name_prefix, provenance
+            key, path.read_text(encoding="utf-8"), module_name, known_names, name_prefix, provenance
         )
         records.extend(file_records)
-        print(f"  {path.name}: {len(file_records)} records")
+        print(f"  {key}: {len(file_records)} records")
     return records
 
 
 def main():
     version = __import__(parsed_module_name).__version__
-
-    source_dir = examples_src_dir(version)
-    if not source_dir.exists():
-        print(f"No sources at {source_dir} - run fetch_official_example_code.py first")
-        return
-
     known_names = {r["name"] for r in read_jsonl(api_jsonl_path(version))}
-    records = parse_source_dir(source_dir, parsed_module_name, known_names, "examples")
 
-    output_path = examples_jsonl_path(version)
-    write_jsonl(records, output_path)
-    unknown_count = sum(1 for r in records if r.get("unknown_refs"))
-    print(f"Wrote {len(records)} example records to {output_path}")
-    if unknown_count:
-        print(f"WARNING: {unknown_count} records reference names that don't resolve against {version}")
+    for source in code_sources(version):
+        source_dir = source["src_dir"]
+        if not source_dir.exists():
+            print(f"Skipping {source_dir.name} (nothing fetched there yet)")
+            continue
+
+        print(f"{source_dir.name}:")
+        records = parse_source_dir(source_dir, parsed_module_name, known_names, source["name_prefix"])
+        write_jsonl(records, source["jsonl"])
+        unknown_count = sum(1 for r in records if r.get("unknown_refs"))
+        print(f"Wrote {len(records)} records to {source['jsonl']}")
+        if unknown_count:
+            print(f"WARNING: {unknown_count} records reference names that don't resolve against {version}")
 
 
 if __name__ == "__main__":
