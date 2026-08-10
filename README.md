@@ -171,11 +171,17 @@ instead of silently staying stale. Same retry/incremental-flush design as
   Each hit is `{record_id, matched_chunk_type, distance, text}`. The
   returned text is assembled at query time rather than read from the
   vector DB, so editing a recipe's `return_fields` takes effect on the
-  next query with no re-embedding. No MCP dependency — importable by any
-  consumer, not just an MCP server.
+  next query with no re-embedding. `top_k` is clamped to
+  `MAX_TOP_K` (`config/config.py`, default 5) — every hit carries a full
+  record's worth of text, so an unbounded request floods the caller's
+  context. Enforced here rather than in the MCP layer so every consumer is
+  covered. No MCP dependency — importable by any consumer, not just an MCP
+  server.
 - `mcp_server.py`: thin MCP wrapper around `search.py`, exposing a
   `search_rag(query, top_k=5)` tool over stdio for a coding
-  agent to call directly:
+  agent to call directly. The limit is stated in both the tool
+  description and the `top_k` parameter's JSON schema description, so a
+  calling model sees it; over-limit requests are trimmed, not rejected:
   ```bash
   python src/rag_query/mcp_server.py
   ```
