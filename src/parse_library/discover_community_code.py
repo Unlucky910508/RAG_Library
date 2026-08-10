@@ -146,7 +146,14 @@ def fetch_file(repo, branch, path):
 
 def score_file(source_text, module_name, known_names):
     """Static verdict on one file: which APIs it really uses, and whether
-    any reference fails to resolve against the installed version."""
+    any reference fails to resolve against the installed version.
+
+    None means there is nothing to review - the file does not parse, never
+    imports the library, or imports it without calling into it. Files that
+    merely import are common (a type annotation, a re-export, a guarded
+    optional dependency) and carry no usage to learn from, so they are
+    dropped here rather than written out as candidates with an empty
+    apis_used for a human to wade through."""
     try:
         tree = ast.parse(source_text)
     except SyntaxError:
@@ -155,6 +162,8 @@ def score_file(source_text, module_name, known_names):
     if not aliases:
         return None
     used, unknown = collect_api_refs(tree, aliases, known_names)
+    if not used:
+        return None
     return {
         "apis_used": used,
         "unknown_refs": unknown,
@@ -163,7 +172,9 @@ def score_file(source_text, module_name, known_names):
 
 
 def evaluate_repo(repo, entry, meta, module_name, known_names):
-    candidates = []
+    """Returns (candidates, n_skipped). Skipped files are ones with no
+    library usage to review at all - see score_file."""
+    candidates, skipped = [], 0
     for path in sorted(entry["paths"]):
         source_text = fetch_file(repo, entry["branch"], path)
         time.sleep(POLITE_DELAY)
@@ -171,6 +182,7 @@ def evaluate_repo(repo, entry, meta, module_name, known_names):
             continue
         score = score_file(source_text, module_name, known_names)
         if score is None:
+            skipped += 1
             continue
         duplicate = already_ingested(repo, path)
         passes = (
@@ -191,7 +203,7 @@ def evaluate_repo(repo, entry, meta, module_name, known_names):
             "recommended": passes,
             **score,
         })
-    return candidates
+    return candidates, skipped
 
 
 def main():
@@ -202,7 +214,7 @@ def main():
     repos = search_repos(parsed_module_name)
     print(f"  {len(repos)} repositories, {sum(len(e['paths']) for e in repos.values())} files\n")
 
-    candidates = []
+    candidates, import_only = [], 0
     for repo, entry in sorted(repos.items()):
         meta = fetch_repo_metadata(repo)
         time.sleep(POLITE_DELAY)
@@ -213,7 +225,8 @@ def main():
         if reason:
             print(f"  skip {repo}: {reason}")
             continue
-        found = evaluate_repo(repo, entry, meta, parsed_module_name, known_names)
+        found, skipped = evaluate_repo(repo, entry, meta, parsed_module_name, known_names)
+        import_only += skipped
         kept = sum(1 for c in found if c["recommended"])
         print(f"  {repo}: {kept}/{len(found)} files pass ({meta['license']}, {meta['stars']} stars)")
         candidates.extend(found)
@@ -225,6 +238,8 @@ def main():
     recommended = [c for c in candidates if c["recommended"]]
     review = [c for c in recommended if c["license_verdict"] == "needs-review"]
     print(f"\nWrote {len(candidates)} candidates to {output_path}")
+    if import_only:
+        print(f"  ({import_only} files left out - they import the library without using it)")
     print(f"  {len(recommended)} pass the static checks")
     if review:
         print(f"  {len(review)} of those carry an unrecognised licence - read it before using them")
