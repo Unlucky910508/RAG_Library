@@ -21,6 +21,7 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
 from config import (
+    API_KEY,
     CHROMA_DIR,
     CHROMA_DISTANCE_METRIC,
     EMBEDDING_BASE_URL,
@@ -28,7 +29,6 @@ from config import (
     LLM_VERIFY_SSL,
     chroma_collection_name,
     chunk_jsonl_paths,
-    load_llm_api_key,
 )
 
 if not LLM_VERIFY_SSL:
@@ -92,7 +92,7 @@ def find_changed_or_new_chunks(collection, chunks):
     return [c for c in chunks if existing_hashes.get(chunk_id(c)) != text_hash(c["text"])]
 
 
-def load_chunks(collection, chunks, api_key):
+def load_chunks(collection, chunks, API_KEY):
     pending = find_changed_or_new_chunks(collection, chunks)
     print(f"{len(chunks)} chunks, {len(pending)} new or changed, need embedding + loading")
 
@@ -136,7 +136,6 @@ def main():
             print(f"Read {len(file_chunks)} chunks from {path.name}")
         else:
             print(f"Skipping {path} (not generated yet)")
-    api_key = load_llm_api_key()
 
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
     collection = client.get_or_create_collection(
@@ -144,7 +143,7 @@ def main():
         metadata={"hnsw:space": CHROMA_DISTANCE_METRIC},
     )
 
-    load_chunks(collection, chunks, api_key)
+    load_chunks(collection, chunks, API_KEY)
     print(f"Done. Collection '{collection.name}' now has {collection.count()} chunks.")
 
 

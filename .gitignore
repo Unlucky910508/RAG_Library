@@ -1,5 +1,7 @@
 data/
 __pycache__/
 KNOWN_ISSUES.md
-config/key.txt
 config/github_token.txt
+# Holds an API key, and stays out of the way of pulls: copy
+# AI_server_config.template.py to create it.
+config/AI_server_config.py

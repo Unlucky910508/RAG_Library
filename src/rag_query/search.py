@@ -19,6 +19,7 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
 from config import (
+    API_KEY,
     CHROMA_DIR,
     CHROMA_DISTANCE_METRIC,
     CHUNK_FIELDS,
@@ -27,7 +28,6 @@ from config import (
     LLM_VERIFY_SSL,
     MAX_TOP_K,
     chroma_collection_name,
-    load_llm_api_key,
     record_jsonl_paths,
 )
 

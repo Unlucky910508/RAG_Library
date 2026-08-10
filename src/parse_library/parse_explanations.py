@@ -20,7 +20,7 @@ from pathlib import Path
 import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from config import LLM_BASE_URL, LLM_MODEL, LLM_VERIFY_SSL, load_llm_api_key, record_jsonl_paths
+from config import API_KEY, LLM_BASE_URL, LLM_MODEL, LLM_VERIFY_SSL, record_jsonl_paths
 
 if not LLM_VERIFY_SSL:
     requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
@@ -132,7 +132,7 @@ def call_llm_with_retry(record, api_key):
             time.sleep(2 ** attempt)
 
 
-def enrich_with_explanations(records, api_key, path):
+def enrich_with_explanations(records, API_KEY, path):
     pending = [r for r in records if not r.get("explanation")]
     print(f"{len(records)} records, {len(pending)} need an explanation")
 
@@ -151,14 +151,12 @@ def enrich_with_explanations(records, api_key, path):
 def main():
     import pycolmap
 
-    api_key = load_llm_api_key()
-
     for path in record_jsonl_paths(pycolmap.__version__):
         if not path.exists():
             print(f"Skipping {path} (not generated yet)")
             continue
         records = read_jsonl(path)
-        enrich_with_explanations(records, api_key, path)
+        enrich_with_explanations(records, API_KEY, path)
         print(f"Done. Wrote explanations to {path}")
 
 

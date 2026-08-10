@@ -1,21 +1,20 @@
 from pathlib import Path
 
+# Re-exported rather than kept here: which model servers to talk to
+# depends on the machine, while the rest of this file describes the
+# dataset. Importers still get everything from config, so nothing
+# downstream needs to know about the split.
+from AI_server_config import (  # noqa: F401
+    API_KEY,
+    EMBEDDING_BASE_URL,
+    EMBEDDING_MODEL,
+    LLM_BASE_URL,
+    LLM_MODEL,
+    LLM_VERIFY_SSL,
+)
+
 parsed_module_name = "pycolmap"
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-
-LLM_BASE_URL = "http://localhost:8000/v1"
-LLM_MODEL = "Qwen/Qwen3.6-35B-A3B-FP8"
-LLM_API_KEY_FILE = Path(__file__).resolve().parent / "key.txt"
-# Set to False only for known/trusted internal servers using a self-signed
-# certificate - this disables TLS certificate verification entirely.
-LLM_VERIFY_SSL = False
-
-# Same server by default (one OpenAI-compatible endpoint serving both
-# /chat/completions and /embeddings) - override independently if your
-# embedding model is actually hosted elsewhere.
-EMBEDDING_BASE_URL = LLM_BASE_URL
-EMBEDDING_MODEL = "BAAI/bge-m3"
-
 
 # Where the official example scripts live. Left as None, each is worked
 # out from the package itself - the repository and licence from its PyPI
@@ -220,5 +219,3 @@ CHUNK_FIELDS = {
 }
 
 
-def load_llm_api_key():
-    return LLM_API_KEY_FILE.read_text(encoding="utf-8").strip()

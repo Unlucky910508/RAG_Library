@@ -11,7 +11,7 @@ from mcp.server import MCPServer
 from pydantic import Field
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from config import MAX_TOP_K, load_llm_api_key
+from config import API_KEY, MAX_TOP_K
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import search as rag_search
@@ -56,7 +56,7 @@ def load_state():
     return {
         "collection": rag_search.get_collection(version),
         "records_by_id": rag_search.load_records_by_id(version),
-        "api_key": load_llm_api_key(),
+        "api_key": API_KEY,
     }
 
 
