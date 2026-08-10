@@ -9,8 +9,9 @@ library.
 Output (`data/` is gitignored - everything in it is generated locally):
 - `data/pycolmap_{version}_api.jsonl` — one record per API.
 - `data/pycolmap_{version}_examples_src/` — the downloaded official example `.py` files, plus a `_manifest.json` of where each came from.
-- `data/pycolmap_{version}_examples.jsonl` — that example code split into per-function records.
-- `data/pycolmap_{version}_api_chunks.jsonl` / `..._examples_chunks.jsonl` — that data split into embedding chunks, one chunk file per record file (text only, no vectors).
+- `data/pycolmap_{version}_community_src/` — optional; third-party `.py` files that passed the filters, namespaced per repository.
+- `data/pycolmap_{version}_examples.jsonl` / `..._community.jsonl` — that code split into per-function records, one file per source.
+- `data/pycolmap_{version}_api_chunks.jsonl` / `..._examples_chunks.jsonl` / `..._community_chunks.jsonl` — that data split into embedding chunks, one chunk file per record file (text only, no vectors).
 - `data/chroma/` — a persistent Chroma DB holding each chunk's text, metadata, and embedding vector.
 
 ## 1. Environment setup
@@ -84,13 +85,16 @@ the same directory layout.
 ```bash
 python src/parse_library/parse_python_code.py
 ```
-Reads `.py` files from that directory (never the network) and splits each
-into per-function/class records plus a module-context record, writing
-`data/pycolmap_{version}_examples.jsonl` — a separate file, so
-`parse_api.py`'s rebuild can't wipe it. Every reference to the target
-library is statically resolved via `ast` against the API records into
-`apis_used`; unresolvable ones land in `unknown_refs` (zero for the
-official examples — that's the version-alignment check working).
+Reads `.py` files (never the network) from every source directory listed
+in `config.code_sources()` — the official examples above, plus community
+code if it has been fetched — and splits each into per-function/class
+records plus a module-context record. Each source writes its own jsonl and
+prefixes its record names (`examples/…`, `community/…`) so a hit is
+traceable to where the code came from, and each stays separate from
+`parse_api.py`'s output so its rebuild can't wipe them. Every reference to
+the target library is statically resolved via `ast` against the API
+records into `apis_used`; unresolvable ones land in `unknown_refs` (zero
+for the official examples — that's the version-alignment check working).
 
 Functions and classes that never touch the target library are **left
 out** — argument parsers, plotting helpers, plain dataclasses. In a RAG
@@ -107,18 +111,20 @@ lower bound. Python only — other languages would need a sibling
 
 #### Optional: finding more example code
 
-The official examples are a small corpus. To see what third-party code
+The official examples are a small corpus. To pull in third-party code that
 uses the library:
 
 ```bash
-python src/parse_library/discover_community_code.py
+python src/parse_library/fetch_community_code.py
 ```
 Searches grep.app for repositories importing the target library, adds
 licence and activity from GitHub's API, downloads the matching files and
-scores each one. No credentials needed. Optionally, a GitHub token in
-`config/github_token.txt` (gitignored, no scopes required) raises the API
-limit from 60 requests an hour to 5000 — useful when re-running while
-tuning the filters.
+scores each one, keeping those that pass in
+`data/pycolmap_{version}_community_src/` (namespaced per repository, with
+a `_manifest.json` carrying each file's URL and licence). No credentials
+needed. Optionally, a GitHub token in `config/github_token.txt`
+(gitignored, no scopes required) raises the API limit from 60 requests an
+hour to 5000 — useful when re-running while tuning the filters.
 
 Stars and recency are only cheap prefilters. What decides a file is the
 same static check as above — every reference must resolve against the
@@ -135,10 +141,13 @@ licence allowlist live in `config/config.py`.
 Files that import the library without calling into it are left out
 entirely rather than listed with an empty `apis_used`.
 
-This writes `data/pycolmap_{version}_community_candidates.jsonl` and
-stops there — **nothing enters the dataset from it**. Third-party code
-carries licence obligations and version risk worth a person's judgement
-before an agent starts quoting it. Note that GitHub's licence detection
+Every decision is recorded in
+`data/pycolmap_{version}_community_candidates.jsonl`. Downloading is not
+ingesting: **nothing reaches the dataset until you run
+`parse_python_code.py`**, so read that file and delete anything unwanted
+from the source directory first. Third-party code carries licence
+obligations and version risk worth a person's judgement before an agent
+starts quoting it. Note that GitHub's licence detection
 returns `NOASSERTION` fairly often, including for `colmap/colmap` itself
 whose `COPYING.txt` is plain BSD, so those are flagged for review rather
 than dropped.
