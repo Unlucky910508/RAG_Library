@@ -52,12 +52,11 @@ from config import (
     COMMUNITY_MAX_UNKNOWN_REFS,
     COMMUNITY_MIN_APIS_PER_FUNCTION,
     COMMUNITY_MIN_STARS,
-    EXAMPLES_GITHUB_REPO,
-    EXAMPLES_PATH_IN_REPO,
     EXAMPLES_MANIFEST_NAME,
     api_jsonl_path,
     community_candidates_path,
     community_src_dir,
+    examples_src_dir,
     load_github_token,
     parsed_module_name,
 )
@@ -128,11 +127,31 @@ def fetch_repo_metadata(repo, token=None):
     }
 
 
-def already_ingested(repo, path):
-    """The official fetcher already takes this exact file, so recommending
-    it again would just duplicate what the dataset holds. Scoped to that
-    one directory: the rest of the upstream repo is fair game."""
-    return repo == EXAMPLES_GITHUB_REPO and path.startswith(EXAMPLES_PATH_IN_REPO + "/")
+def official_source(version):
+    """The repository and directory the official fetch actually used, read
+    from the manifest it left behind.
+
+    Taken from there rather than from config, because the config settings
+    naming them are optional - resolved at fetch time when left as None,
+    which made comparing against them silently match nothing and let the
+    official examples through as community finds. The manifest records
+    what was really downloaded, so it cannot drift from it."""
+    manifest_path = examples_src_dir(version) / EXAMPLES_MANIFEST_NAME
+    if not manifest_path.exists():
+        return None
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    repo, path = manifest.get("repo"), manifest.get("path_in_repo")
+    return (repo, path) if repo and path else None
+
+
+def already_ingested(repo, path, official):
+    """The official fetch already takes this exact file, so taking it again
+    would duplicate what the dataset holds. Scoped to that one directory:
+    the rest of the upstream repository is fair game."""
+    if official is None:
+        return False
+    official_repo, official_path = official
+    return repo == official_repo and path.startswith(official_path + "/")
 
 
 def licence_verdict(license_id):
@@ -207,23 +226,28 @@ def local_path_for(repo, path):
     return Path(repo.replace("/", "__")) / path
 
 
-def evaluate_repo(repo, entry, meta, module_name, known_names, dest_dir):
+def evaluate_repo(repo, entry, meta, module_name, known_names, dest_dir, official):
     """Score each file, writing out the ones that pass. Returns
-    (candidates, n_skipped); skipped files have no library usage at all."""
-    candidates, skipped = [], 0
+    (candidates, n_unused, n_duplicate); unused files never call the
+    library, duplicates are the official fetch's own."""
+    candidates, unused, duplicate_count = [], 0, 0
     for path in sorted(entry["paths"]):
+        # Checked before fetching: a file the official fetch already has is
+        # one we will not keep either way, so downloading it to find that
+        # out is a wasted request.
+        if already_ingested(repo, path, official):
+            duplicate_count += 1
+            continue
         source_text = fetch_file(repo, entry["branch"], path)
         time.sleep(POLITE_DELAY)
         if source_text is None:
             continue
         score = score_file(source_text, module_name, known_names)
         if score is None:
-            skipped += 1
+            unused += 1
             continue
-        duplicate = already_ingested(repo, path)
         passes = (
-            not duplicate
-            and score["qualifying_functions"] >= 1
+            score["qualifying_functions"] >= 1
             and len(score["unknown_refs"]) <= COMMUNITY_MAX_UNKNOWN_REFS
         )
         relative = local_path_for(repo, path)
@@ -241,11 +265,10 @@ def evaluate_repo(repo, entry, meta, module_name, known_names, dest_dir):
             "license_verdict": licence_verdict(meta["license"]),
             "stars": meta["stars"],
             "pushed_at": meta["pushed_at"],
-            "already_ingested": duplicate,
             "recommended": passes,
             **score,
         })
-    return candidates, skipped
+    return candidates, unused, duplicate_count
 
 
 def main():
@@ -257,11 +280,18 @@ def main():
     dest_dir = community_src_dir(version)
     dest_dir.mkdir(parents=True, exist_ok=True)
 
+    official = official_source(version)
+    if official:
+        print(f"Official fetch holds {official[1]}/ of {official[0]} - skipping those")
+    else:
+        print("No official fetch found - run fetch_official_example_code.py first "
+              "or its files will be picked up here as community finds")
+
     print(f"Searching grep.app for code importing {parsed_module_name}")
     repos = search_repos(parsed_module_name)
     print(f"  {len(repos)} repositories, {sum(len(e['paths']) for e in repos.values())} files\n")
 
-    candidates, import_only = [], 0
+    candidates, import_only, duplicates = [], 0, 0
     for repo, entry in sorted(repos.items()):
         meta = fetch_repo_metadata(repo, token)
         time.sleep(POLITE_DELAY)
@@ -272,10 +302,14 @@ def main():
         if reason:
             print(f"  skip {repo}: {reason}")
             continue
-        found, skipped = evaluate_repo(repo, entry, meta, parsed_module_name, known_names, dest_dir)
-        import_only += skipped
+        found, unused, dupes = evaluate_repo(
+            repo, entry, meta, parsed_module_name, known_names, dest_dir, official
+        )
+        import_only += unused
+        duplicates += dupes
         kept = sum(1 for c in found if c["recommended"])
-        print(f"  {repo}: {kept}/{len(found)} files kept ({meta['license']}, {meta['stars']} stars)")
+        note = f", {dupes} already held officially" if dupes else ""
+        print(f"  {repo}: {kept}/{len(found)} files kept ({meta['license']}, {meta['stars']} stars){note}")
         candidates.extend(found)
 
     candidates.sort(key=lambda c: (not c["recommended"], -c["qualifying_functions"], -c["max_apis_in_function"]))
@@ -297,8 +331,10 @@ def main():
     review = [c for c in kept if c["license_verdict"] == "needs-review"]
     print(f"\nKept {len(kept)} files in {dest_dir}, "
           f"holding {sum(c['qualifying_functions'] for c in kept)} functions worth reviewing")
+    if duplicates:
+        print(f"  ({duplicates} skipped without downloading - the official fetch already holds them)")
     if import_only:
-        print(f"  ({import_only} files never used the library and were not downloaded)")
+        print(f"  ({import_only} downloaded but never used the library, so not kept)")
     print(f"  decisions recorded in {community_candidates_path(version)}")
     if review:
         print(f"  {len(review)} carry an unrecognised licence - read it before keeping them")
