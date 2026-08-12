@@ -86,8 +86,12 @@ Downloads the official example scripts at the tag matching the installed
 library version — never master, so example code can't drift ahead of the
 API records. Writes the `.py` files to
 `data/pycolmap_{version}_examples_src/` plus a `_manifest.json` recording
-each file's upstream URL, ref, and license. Test scaffolding
-(`conftest.py`, `*_test.py`) is skipped. Downloading only — a source that
+each file's upstream URL, ref, and license. Everything in the directory
+is taken except `conftest.py`, which is pytest wiring; tests are kept,
+since a test living beside the examples drives them end to end and shows
+real usage. Whether a file uses the library at all is decided by
+`parse_python_code.py`, which reads it, not guessed from its name.
+Downloading only — a source that
 needs a different acquisition method gets its own `fetch_*` script writing
 the same directory layout.
 
