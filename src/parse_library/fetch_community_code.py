@@ -47,11 +47,11 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
 from config import (
     COMMUNITY_LICENSE_ALLOWLIST,
-    COMMUNITY_LICENSE_REVIEW,
     COMMUNITY_MAX_AGE_DAYS,
     COMMUNITY_MAX_UNKNOWN_REFS,
     COMMUNITY_MIN_APIS_PER_FUNCTION,
     COMMUNITY_MIN_STARS,
+    COMMUNITY_SEARCH_PAGES,
     EXAMPLES_MANIFEST_NAME,
     api_jsonl_path,
     community_candidates_path,
@@ -68,7 +68,6 @@ GREP_APP_SEARCH = "https://grep.app/api/search"
 GITHUB_REPO_API = "https://api.github.com/repos"
 RAW_CONTENT = "https://raw.githubusercontent.com"
 USER_AGENT = "Mozilla/5.0"
-SEARCH_PAGES = 10
 POLITE_DELAY = 0.5
 
 
@@ -83,7 +82,7 @@ def write_jsonl(records, path):
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
-def search_repos(module_name, pages=SEARCH_PAGES):
+def search_repos(module_name, pages=COMMUNITY_SEARCH_PAGES):
     """Map repo -> {branch, paths} for files importing the library."""
     found = {}
     for page in range(1, pages + 1):
@@ -154,19 +153,19 @@ def already_ingested(repo, path, official):
     return repo == official_repo and path.startswith(official_path + "/")
 
 
-def licence_verdict(license_id):
-    if license_id in COMMUNITY_LICENSE_ALLOWLIST:
-        return "allowed"
-    if license_id in COMMUNITY_LICENSE_REVIEW:
-        return "needs-review"
-    return "rejected"
+def licence_allowed(license_id):
+    """Only licences whose terms are known. GitHub's NOASSERTION means a
+    licence exists but could not be identified, which is not the same as
+    permissive - Tencent's HY-World agreement reads that way and carries
+    territorial limits and distribution duties."""
+    return license_id in COMMUNITY_LICENSE_ALLOWLIST
 
 
 def repo_prefilter(meta):
     """Cheap reasons to not spend requests on a repo's files."""
     if meta["is_fork"]:
         return "fork"
-    if licence_verdict(meta["license"]) == "rejected":
+    if not licence_allowed(meta["license"]):
         return f"licence {meta['license']}"
     if meta["stars"] < COMMUNITY_MIN_STARS:
         return f"{meta['stars']} stars"
@@ -262,7 +261,6 @@ def evaluate_repo(repo, entry, meta, module_name, known_names, dest_dir, officia
             "local_path": str(relative),
             "source": f"https://github.com/{repo}/blob/{entry['branch']}/{path}",
             "license": meta["license"],
-            "license_verdict": licence_verdict(meta["license"]),
             "stars": meta["stars"],
             "pushed_at": meta["pushed_at"],
             "recommended": passes,
@@ -328,16 +326,15 @@ def main():
         json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8"
     )
 
-    review = [c for c in kept if c["license_verdict"] == "needs-review"]
+    licenses = sorted({c["license"] for c in kept})
     print(f"\nKept {len(kept)} files in {dest_dir}, "
           f"holding {sum(c['qualifying_functions'] for c in kept)} functions worth reviewing")
     if duplicates:
         print(f"  ({duplicates} skipped without downloading - the official fetch already holds them)")
     if import_only:
         print(f"  ({import_only} downloaded but never used the library, so not kept)")
+    print(f"  licences: {', '.join(licenses) if licenses else 'none'}")
     print(f"  decisions recorded in {community_candidates_path(version)}")
-    if review:
-        print(f"  {len(review)} carry an unrecognised licence - read it before keeping them")
     print("Review the directory and delete anything unwanted, then run parse_python_code.py.")
 
 

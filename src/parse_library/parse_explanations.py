@@ -132,7 +132,7 @@ def call_llm_with_retry(record, api_key):
             time.sleep(2 ** attempt)
 
 
-def enrich_with_explanations(records, API_KEY, path):
+def enrich_with_explanations(records, api_key, path):
     pending = [r for r in records if not r.get("explanation")]
     print(f"{len(records)} records, {len(pending)} need an explanation")
 

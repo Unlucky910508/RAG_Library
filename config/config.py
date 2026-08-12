@@ -85,12 +85,27 @@ COMMUNITY_LICENSE_ALLOWLIST = {
     "0BSD",
     "Unlicense",
 }
-# GitHub reports NOASSERTION when it cannot match a repo's LICENSE to a
-# known one, which in practice often means a custom research-only grant.
-# Neither auto-accepted nor auto-dropped: flagged for a human to read.
-COMMUNITY_LICENSE_REVIEW = {"NOASSERTION"}
+# Anything not on the list above is turned away, including GitHub's
+# NOASSERTION - which means a licence file exists but could not be matched
+# to a known one, so its terms are unknown until somebody reads them.
+#
+# These were once collected for review instead. Dropping them is the safer
+# trade: code that reaches the dataset gets quoted to an agent and can end
+# up shaping what it writes, and obligations do not stop applying because
+# a file was split into functions first. The corpus is easier to widen -
+# raise COMMUNITY_SEARCH_PAGES, lower COMMUNITY_MIN_STARS - than to audit
+# after the fact.
+#
+# The cost is real: colmap's own COPYING.txt reads NOASSERTION because its
+# BSD text carries a preamble about dependencies, so the upstream
+# project's benchmark code is turned away too. Set EXAMPLES_* or add an
+# allowlist entry if you have read a licence and want it accepted.
 COMMUNITY_MIN_STARS = 200
 COMMUNITY_MAX_AGE_DAYS = 730
+# Pages of grep.app results to walk. Raising this is the cheap way to make
+# up for a strict licence policy: search wider rather than accept less
+# certain code.
+COMMUNITY_SEARCH_PAGES = 20
 # Measured per function, because that is the unit parse_python_code.py
 # turns into a record: the question is whether a file contains at least
 # one function that would make a good one. Counting distinct APIs across a
