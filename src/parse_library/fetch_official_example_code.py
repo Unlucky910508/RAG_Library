@@ -18,8 +18,9 @@ another project's code, which is far worse than an error.
 
 Fetching happens at the tag matching the installed version, never the
 development branch, so example code cannot drift ahead of the API
-records. Test scaffolding (conftest.py, *_test.py) is skipped: it is not
-tutorial content.
+records. Everything in the directory is taken except conftest.py, which
+is pytest wiring; whether a file actually uses the library is decided by
+parse_python_code.py, which reads it, rather than guessed from its name.
 
 Downloading only; turning .py files into records is parse_python_code.py's
 job, which reads this directory and never touches the network. A
@@ -50,8 +51,15 @@ from config import (
 
 PYPI_API = "https://pypi.org/pypi"
 GITHUB_API = "https://api.github.com/repos"
+# conftest.py holds pytest wiring and nothing a reader could learn from.
+# Tests are not skipped: a test living beside the examples drives them
+# end to end, so it shows real usage - custom_incremental_pipeline_test.py
+# has four functions using five to seven APIs each, denser than most of
+# what the community fetch keeps. The unit tests under src/ that motivated
+# skipping tests are a different thing and are not in this directory.
+# Files that turn out to use nothing are dropped by parse_python_code.py,
+# which can see that; a filename cannot.
 SKIP_FILES = {"conftest.py"}
-SKIP_SUFFIXES = ("_test.py",)
 # Ordered by how directly a key names the source, since a project may list
 # several and its issue tracker is not its repository.
 REPO_URL_KEYS = ("Repository", "Source", "Source Code", "Code", "GitHub", "Homepage")
@@ -199,7 +207,7 @@ def resolve_source(package, version, token):
 
 
 def is_example_file(name):
-    return name.endswith(".py") and name not in SKIP_FILES and not name.endswith(SKIP_SUFFIXES)
+    return name.endswith(".py") and name not in SKIP_FILES
 
 
 def list_example_files(source, token):
