@@ -211,10 +211,15 @@ CHUNK_FIELDS = {
         "required": ["signatures"],
         "return_fields": ["name", "kind", "signatures", "parameter_names", "doc", "explanation"],
     },
+    "example_workflow": {
+        "embedding_fields": ["name", "apis_used"],
+        "required": ["code"],
+        "return_fields": ["name", "source", "apis_used"],
+    },
     "example": {
         "embedding_fields": ["name", "apis_used", "code"],
         "required": ["code"],
-        "return_fields": ["name", "source", "apis_used", "code"],
+        "return_fields": ["name", "source", "code"],
     },
 }
 
