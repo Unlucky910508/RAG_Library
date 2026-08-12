@@ -170,16 +170,21 @@ licence allowlist live in `config/config.py`.
 Files that import the library without calling into it are left out
 entirely rather than listed with an empty `apis_used`.
 
+Only licences on `COMMUNITY_LICENSE_ALLOWLIST` are accepted. GitHub's
+`NOASSERTION` — a licence file exists but could not be matched to a known
+one — is **turned away**, since unknown terms are not the same as
+permissive ones: Tencent's HY-World agreement reads that way and excludes
+the EU, UK and South Korea outright. That also costs some genuinely
+permissive code (`colmap/colmap`'s own `COPYING.txt` reads `NOASSERTION`
+because its BSD text carries a preamble), which is why
+`COMMUNITY_SEARCH_PAGES` is set generously: widening the search is
+cheaper than auditing licences after the fact.
+
 Every decision is recorded in
 `data/pycolmap_{version}_community_candidates.jsonl`. Downloading is not
 ingesting: **nothing reaches the dataset until you run
 `parse_python_code.py`**, so read that file and delete anything unwanted
-from the source directory first. Third-party code carries licence
-obligations and version risk worth a person's judgement before an agent
-starts quoting it. Note that GitHub's licence detection
-returns `NOASSERTION` fairly often, including for `colmap/colmap` itself
-whose `COPYING.txt` is plain BSD, so those are flagged for review rather
-than dropped.
+from the source directory first.
 
 ```bash
 python src/parse_library/parse_explanations.py
