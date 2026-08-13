@@ -10,7 +10,7 @@ from AI_server_config import (  # noqa: F401
     EMBEDDING_MODEL,
     LLM_BASE_URL,
     LLM_MODEL,
-    LLM_VERIFY_SSL,
+    VERIFY_SSL,
 )
 
 parsed_module_name = "pycolmap"

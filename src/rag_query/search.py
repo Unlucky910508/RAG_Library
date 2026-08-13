@@ -25,7 +25,7 @@ from config import (
     CHUNK_FIELDS,
     EMBEDDING_BASE_URL,
     EMBEDDING_MODEL,
-    LLM_VERIFY_SSL,
+    VERIFY_SSL,
     MAX_TOP_K,
     chroma_collection_name,
     record_jsonl_paths,
@@ -34,7 +34,7 @@ from config import (
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "common"))
 from record_fields import build_text
 
-if not LLM_VERIFY_SSL:
+if VERIFY_SSL is False:
     requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
 # Chroma dedupes multiple matching chunk_types (e.g. both "explanation"
@@ -71,7 +71,7 @@ def embed_query(text, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
         json={"model": EMBEDDING_MODEL, "input": text},
         timeout=60,
-        verify=LLM_VERIFY_SSL,
+        verify=VERIFY_SSL,
     )
     if not response.ok:
         raise requests.HTTPError(

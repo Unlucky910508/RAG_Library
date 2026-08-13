@@ -20,9 +20,9 @@ from pathlib import Path
 import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from config import API_KEY, LLM_BASE_URL, LLM_MODEL, LLM_VERIFY_SSL, record_jsonl_paths
+from config import API_KEY, LLM_BASE_URL, LLM_MODEL, VERIFY_SSL, record_jsonl_paths
 
-if not LLM_VERIFY_SSL:
+if VERIFY_SSL is False:
     requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
 GROUNDING_RULE = (
@@ -111,7 +111,7 @@ def call_llm(record, api_key):
             ],
         },
         timeout=60,
-        verify=LLM_VERIFY_SSL,
+        verify=VERIFY_SSL,
     )
     if not response.ok:
         raise requests.HTTPError(

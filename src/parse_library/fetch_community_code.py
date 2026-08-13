@@ -52,6 +52,7 @@ from config import (
     COMMUNITY_MIN_APIS_PER_FUNCTION,
     COMMUNITY_MIN_STARS,
     COMMUNITY_SEARCH_PAGES,
+    VERIFY_SSL,
     EXAMPLES_MANIFEST_NAME,
     api_jsonl_path,
     community_candidates_path,
@@ -60,6 +61,9 @@ from config import (
     load_github_token,
     parsed_module_name,
 )
+
+if VERIFY_SSL is False:
+    requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from parse_python_code import collect_api_refs, collect_module_aliases
@@ -91,6 +95,7 @@ def search_repos(module_name, pages=COMMUNITY_SEARCH_PAGES):
             params={"q": f"import {module_name}", "page": page},
             headers={"User-Agent": USER_AGENT},
             timeout=30,
+            verify=VERIFY_SSL,
         )
         if not response.ok:
             print(f"  grep.app page {page}: HTTP {response.status_code}, stopping")
@@ -113,7 +118,7 @@ def github_headers(token):
 
 
 def fetch_repo_metadata(repo, token=None):
-    response = requests.get(f"{GITHUB_REPO_API}/{repo}", headers=github_headers(token), timeout=30)
+    response = requests.get(f"{GITHUB_REPO_API}/{repo}", headers=github_headers(token), timeout=30, verify=VERIFY_SSL)
     if not response.ok:
         return None
     data = response.json()
@@ -177,7 +182,7 @@ def repo_prefilter(meta):
 
 
 def fetch_file(repo, branch, path):
-    response = requests.get(f"{RAW_CONTENT}/{repo}/{branch}/{path}", timeout=30)
+    response = requests.get(f"{RAW_CONTENT}/{repo}/{branch}/{path}", timeout=30, verify=VERIFY_SSL)
     return response.text if response.ok else None
 
 

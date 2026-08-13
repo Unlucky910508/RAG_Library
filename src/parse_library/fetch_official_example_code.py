@@ -45,9 +45,13 @@ from config import (
     EXAMPLES_MANIFEST_NAME,
     EXAMPLES_PATH_IN_REPO,
     examples_src_dir,
+    VERIFY_SSL,
     load_github_token,
     parsed_module_name,
 )
+
+if VERIFY_SSL is False:
+    requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
 PYPI_API = "https://pypi.org/pypi"
 GITHUB_API = "https://api.github.com/repos"
@@ -79,7 +83,7 @@ def github_headers(token):
 
 
 def pypi_metadata(package):
-    response = requests.get(f"{PYPI_API}/{package}/json", timeout=30)
+    response = requests.get(f"{PYPI_API}/{package}/json", timeout=30, verify=VERIFY_SSL)
     if not response.ok:
         raise Unresolved(
             f"where {package} comes from",
@@ -131,7 +135,11 @@ def resolve_ref(repo, version, token):
     """The tag for this version. Projects differ on the leading v, so both
     spellings are tried before giving up."""
     response = requests.get(
-        f"{GITHUB_API}/{repo}/tags", params={"per_page": 100}, headers=github_headers(token), timeout=30
+        f"{GITHUB_API}/{repo}/tags",
+        params={"per_page": 100},
+        headers=github_headers(token),
+        timeout=30,
+        verify=VERIFY_SSL,
     )
     tags = {t["name"] for t in response.json()} if response.ok else set()
     for candidate in (version, f"v{version}"):
@@ -152,6 +160,7 @@ def find_example_dirs(repo, ref, token):
         params={"recursive": "1"},
         headers=github_headers(token),
         timeout=60,
+        verify=VERIFY_SSL,
     )
     if not response.ok:
         return {}
@@ -212,13 +221,13 @@ def is_example_file(name):
 
 def list_example_files(source, token):
     url = f"{GITHUB_API}/{source['repo']}/contents/{source['path']}"
-    response = requests.get(url, params={"ref": source["ref"]}, headers=github_headers(token), timeout=30)
+    response = requests.get(url, params={"ref": source["ref"]}, headers=github_headers(token), timeout=30, verify=VERIFY_SSL)
     response.raise_for_status()
     return [(e["name"], e["download_url"]) for e in response.json() if is_example_file(e["name"])]
 
 
 def fetch_text(url):
-    response = requests.get(url, timeout=30)
+    response = requests.get(url, timeout=30, verify=VERIFY_SSL)
     response.raise_for_status()
     return response.text
 

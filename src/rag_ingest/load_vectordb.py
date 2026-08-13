@@ -26,12 +26,12 @@ from config import (
     CHROMA_DISTANCE_METRIC,
     EMBEDDING_BASE_URL,
     EMBEDDING_MODEL,
-    LLM_VERIFY_SSL,
+    VERIFY_SSL,
     chroma_collection_name,
     chunk_jsonl_paths,
 )
 
-if not LLM_VERIFY_SSL:
+if VERIFY_SSL is False:
     requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
 SAVE_EVERY = 20
@@ -57,7 +57,7 @@ def call_embedding(text, api_key):
         headers={"Authorization": f"Bearer {api_key}"},
         json={"model": EMBEDDING_MODEL, "input": text},
         timeout=60,
-        verify=LLM_VERIFY_SSL,
+        verify=VERIFY_SSL,
     )
     if not response.ok:
         raise requests.HTTPError(
@@ -92,7 +92,7 @@ def find_changed_or_new_chunks(collection, chunks):
     return [c for c in chunks if existing_hashes.get(chunk_id(c)) != text_hash(c["text"])]
 
 
-def load_chunks(collection, chunks, API_KEY):
+def load_chunks(collection, chunks, api_key):
     pending = find_changed_or_new_chunks(collection, chunks)
     print(f"{len(chunks)} chunks, {len(pending)} new or changed, need embedding + loading")
 
