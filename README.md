@@ -45,6 +45,11 @@ Then fill it in:
 - `API_KEY` — the key for that server
 - `EMBEDDING_BASE_URL` / `EMBEDDING_MODEL` — default to the same server, override if your
   embedding model is hosted elsewhere
+- `VERIFY_SSL` — TLS verification for **every** outbound request (model servers, PyPI,
+  GitHub, grep.app). `True` verifies normally; a path like `"/path/ca.pem"` verifies against
+  a CA bundle, which is what a corporate proxy needs and keeps verification on; `False`
+  disables it, which also accepts any certificate from the public services this fetches
+  code from — prefer the bundle if you can get it
 
 `config/AI_server_config.py` is gitignored: your key stays local, and
 pulling a newer version of the pipeline never touches your settings or
