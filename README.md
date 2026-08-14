@@ -73,17 +73,21 @@ record per public API (module/class/function/method/property/enum_member/
 constant) to `data/pycolmap_{version}_api.jsonl`.
 
 ```bash
-python src/parse_library/filter_api_records.py filter/pycolmap_4.1.0/exclude.py --exclude
+python src/parse_library/filter_api_records.py --exclude
 ```
 Optional, and only worth it for a library that exposes far more than you
-want indexed. Drops records by name prefix, reading every list of strings
-in the given file (grouped however reads best — variable names are
-ignored). `--exclude` drops what matches, `--keep` drops what doesn't;
-`--dry-run` reports without writing. A prefix matches that exact name and
-everything beneath it, so `pycolmap.Camera` drops `Camera.create` but
-leaves `CameraModelId` alone.
+want indexed. Drops records by name prefix: `--exclude` drops what
+matches, `--keep` drops what doesn't, `--dry-run` reports without writing.
+A prefix matches that exact name and everything beneath it, so
+`pycolmap.Camera` drops `Camera.create` but leaves `CameraModelId` alone.
 
-Filter files live in `filter/<module>_<version>/` and are checked in.
+The policy names the file — `--exclude` reads
+`filter/<module>_<version>/exclude.py`, `--keep` reads `keep.py` — so
+there is no path to pass. Every list of strings in that file is read and
+merged, so prefixes can be grouped by reason under whatever names read
+best; the variable names are ignored. Filter files are checked in, since
+which parts of a library are worth indexing is a judgement worth keeping.
+
 Run this here rather than later: a record dropped now costs nothing,
 while one dropped after `parse_explanations.py` throws away an LLM call.
 
