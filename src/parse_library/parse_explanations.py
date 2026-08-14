@@ -20,7 +20,14 @@ from pathlib import Path
 import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from config import API_KEY, LLM_BASE_URL, LLM_MODEL, VERIFY_SSL, record_jsonl_paths
+from config import (
+    API_KEY,
+    LLM_BASE_URL,
+    LLM_MODEL,
+    VERIFY_SSL,
+    parsed_module_name,
+    record_jsonl_paths,
+)
 
 if VERIFY_SSL is False:
     requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
@@ -149,9 +156,7 @@ def enrich_with_explanations(records, api_key, path):
 
 
 def main():
-    import pycolmap
-
-    for path in record_jsonl_paths(pycolmap.__version__):
+    for path in record_jsonl_paths(__import__(parsed_module_name).__version__):
         if not path.exists():
             print(f"Skipping {path} (not generated yet)")
             continue

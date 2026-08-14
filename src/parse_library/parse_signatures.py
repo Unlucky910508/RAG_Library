@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from config import api_jsonl_path
+from config import api_jsonl_path, parsed_module_name
 
 OVERLOAD_LINE_RE = re.compile(r"^\d+\.\s+(.+)$")
 IMPLICIT_PARAM_NAMES = {"self", "cls"}
@@ -298,9 +298,7 @@ def write_jsonl(records, path):
 
 
 def main():
-    import pycolmap
-
-    path = api_jsonl_path(pycolmap.__version__)
+    path = api_jsonl_path(__import__(parsed_module_name).__version__)
 
     records = read_jsonl(path)
     enrich_records(records)

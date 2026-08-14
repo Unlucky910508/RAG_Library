@@ -29,6 +29,7 @@ from config import (
     VERIFY_SSL,
     chroma_collection_name,
     chunk_jsonl_paths,
+    parsed_module_name,
 )
 
 if VERIFY_SSL is False:
@@ -126,10 +127,8 @@ def load_chunks(collection, chunks, api_key):
 
 
 def main():
-    import pycolmap
-
     chunks = []
-    for path in chunk_jsonl_paths(pycolmap.__version__):
+    for path in chunk_jsonl_paths(__import__(parsed_module_name).__version__):
         if path.exists():
             file_chunks = read_jsonl(path)
             chunks.extend(file_chunks)
@@ -139,7 +138,7 @@ def main():
 
     client = chromadb.PersistentClient(path=str(CHROMA_DIR))
     collection = client.get_or_create_collection(
-        name=chroma_collection_name(pycolmap.__version__),
+        name=chroma_collection_name(__import__(parsed_module_name).__version__),
         metadata={"hnsw:space": CHROMA_DISTANCE_METRIC},
     )
 
