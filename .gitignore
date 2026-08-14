@@ -1,4 +1,7 @@
 data/
+# Which parts of a library to index is a local judgement, and the pipeline
+# runs without any filter file - the step just reports there is none.
+filter/
 __pycache__/
 KNOWN_ISSUES.md
 config/github_token.txt

@@ -15,8 +15,9 @@ from AI_server_config import (  # noqa: F401
 
 parsed_module_name = "pycolmap"
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
-# Checked in, unlike data/: which parts of a library are worth indexing is
-# a judgement worth keeping and sharing, not a generated artefact.
+# Not tracked by git, like data/: which parts of a library to index is a
+# local judgement, and the filtering step is optional - absent a file it
+# says so and stops rather than failing the pipeline.
 FILTER_DIR = Path(__file__).resolve().parent.parent / "filter"
 
 # Where the official example scripts live. Left as None, each is worked
