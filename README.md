@@ -73,6 +73,21 @@ record per public API (module/class/function/method/property/enum_member/
 constant) to `data/pycolmap_{version}_api.jsonl`.
 
 ```bash
+python src/parse_library/filter_api_records.py filter/pycolmap_4.1.0/exclude.py --exclude
+```
+Optional, and only worth it for a library that exposes far more than you
+want indexed. Drops records by name prefix, reading every list of strings
+in the given file (grouped however reads best — variable names are
+ignored). `--exclude` drops what matches, `--keep` drops what doesn't;
+`--dry-run` reports without writing. A prefix matches that exact name and
+everything beneath it, so `pycolmap.Camera` drops `Camera.create` but
+leaves `CameraModelId` alone.
+
+Filter files live in `filter/<module>_<version>/` and are checked in.
+Run this here rather than later: a record dropped now costs nothing,
+while one dropped after `parse_explanations.py` throws away an LLM call.
+
+```bash
 python src/parse_library/parse_signatures.py
 ```
 Enriches each record in place with signatures, structured parameters
