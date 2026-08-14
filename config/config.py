@@ -15,6 +15,9 @@ from AI_server_config import (  # noqa: F401
 
 parsed_module_name = "pycolmap"
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+# Checked in, unlike data/: which parts of a library are worth indexing is
+# a judgement worth keeping and sharing, not a generated artefact.
+FILTER_DIR = Path(__file__).resolve().parent.parent / "filter"
 
 # Where the official example scripts live. Left as None, each is worked
 # out from the package itself - the repository and licence from its PyPI
@@ -127,6 +130,13 @@ def community_candidates_path(version):
 
 def community_src_dir(version):
     return DATA_DIR / f"{parsed_module_name}_{version}_community_src"
+
+
+def api_filter_path(version, mode):
+    """The prefix list for one filtering policy. Named after the policy -
+    exclude.py, keep.py - so asking for a policy is enough to say which
+    file to read."""
+    return FILTER_DIR / f"{parsed_module_name}_{version}" / f"{mode}.py"
 
 
 def api_jsonl_path(version):

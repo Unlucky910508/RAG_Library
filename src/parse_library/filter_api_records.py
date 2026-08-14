@@ -5,10 +5,18 @@ Introspection takes everything a library exposes, which for a large one
 is mostly not what anyone would search for - private module trees, test
 helpers, vendored dependencies. Narrowing that surface is a judgement
 about the library rather than something the pipeline can work out, so it
-lives in files under filter/, one directory per library and version:
+lives in files under filter/, one directory per library and version, each
+file named after the policy it holds:
 
     filter/pycolmap_4.1.0/exclude.py
-    filter/torch_2.9.1/exclude.py
+    filter/torch_2.9.1/keep.py
+
+Which is why asking for a policy is enough - the file follows from it and
+from parsed_module_name, so there is no path to pass and no way for the
+two to disagree:
+
+    filter_api_records.py --exclude
+    filter_api_records.py --keep --dry-run
 
 Every list of strings in such a file is read and the lists are merged, so
 prefixes can be grouped by reason under whatever names read best - the
@@ -17,9 +25,6 @@ it cannot do anything but declare lists.
 
 A prefix matches the record of that exact name and everything beneath it:
 "torch.jit" drops torch.jit and torch.jit.trace but not torch.jitter.
-
-    filter_api_records.py filter/pycolmap_4.1.0/exclude.py --exclude
-    filter_api_records.py filter/pycolmap_4.1.0/keep.py --keep --dry-run
 
 Meant to run straight after parse_api.py, before the enrichment steps: a
 record dropped now costs nothing, while one dropped after
@@ -34,7 +39,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from config import api_jsonl_path, parsed_module_name
+from config import api_filter_path, api_jsonl_path, parsed_module_name
 
 
 def read_jsonl(path):
@@ -101,35 +106,41 @@ def summarise(dropped, prefixes, mode):
 
 def parse_args():
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("filter_file", type=Path, help="file of prefix lists under filter/")
     policy = parser.add_mutually_exclusive_group(required=True)
     policy.add_argument("--exclude", action="store_const", dest="mode", const="exclude",
                         help="drop records matching these prefixes")
     policy.add_argument("--keep", action="store_const", dest="mode", const="keep",
                         help="drop records NOT matching these prefixes")
     parser.add_argument("--path", type=Path, help="records file to filter (default: the API records)")
+    parser.add_argument("--filter-file", type=Path,
+                        help="override the prefix list (default: filter/<module>_<version>/<policy>.py)")
     parser.add_argument("--dry-run", action="store_true", help="report what would change, write nothing")
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    if not args.filter_file.exists():
-        sys.exit(f"No such filter file: {args.filter_file}")
-
     version = __import__(parsed_module_name).__version__
+
+    filter_file = args.filter_file or api_filter_path(version, args.mode)
+    if not filter_file.exists():
+        sys.exit(
+            f"No {args.mode} list at {filter_file}.\n"
+            f"Create it with one or more lists of name prefixes, or pass --filter-file."
+        )
+
     path = args.path or api_jsonl_path(version)
     if not path.exists():
         sys.exit(f"No records at {path} - run parse_api.py first")
 
-    prefixes, list_names = load_prefixes(args.filter_file)
+    prefixes, list_names = load_prefixes(filter_file)
     if not prefixes:
-        sys.exit(f"{args.filter_file} declares no lists of strings - nothing to filter on")
+        sys.exit(f"{filter_file} declares no lists of strings - nothing to filter on")
 
     records = read_jsonl(path)
     kept, dropped = partition(records, prefixes, args.mode)
 
-    print(f"{args.filter_file}: {len(prefixes)} prefixes from {', '.join(list_names) or 'unnamed lists'}")
+    print(f"{filter_file}: {len(prefixes)} prefixes from {', '.join(list_names) or 'unnamed lists'}")
     if args.mode == "exclude":
         for prefix, count in summarise(dropped, prefixes, args.mode).items():
             print(f"  {count:5} {prefix}" + ("   (matched nothing)" if not count else ""))
