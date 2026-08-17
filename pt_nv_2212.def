@@ -1,0 +1,111 @@
+Bootstrap: docker
+From: nvcr.io/nvidia/pytorch:22.12-py3
+ 
+%labels
+    Author Casey Chen
+    LastUpdated 2026-06-25
+ 
+%post
+    # Use strict shell mode and avoid interactive apt prompts.
+    set -eux
+    export DEBIAN_FRONTEND=noninteractive
+ 
+    # Update package index.
+    apt-get update
+ 
+    # Install SSH server and common runtime/debug tools.
+    # Do not remove openssh-server. It is required to run sshd.
+    apt-get install -y --no-install-recommends \
+        openssh-server \
+        libwrap0 \
+        apt-utils \
+        sudo \
+        net-tools \
+        iproute2 \
+        htop \
+        libgl1-mesa-dev \
+        ca-certificates
+ 
+    # Prepare the runtime directory required by sshd.
+    mkdir -p /var/run/sshd
+    chown root:root /var/run/sshd
+    chmod 0755 /var/run/sshd
+ 
+    # Generate SSH host keys if they are missing.
+    ssh-keygen -A
+ 
+    # In containers, pam_loginuid may break SSH login.
+    # Make it optional if the rule exists.
+    sed -i 's@session\s*required\s*pam_loginuid.so@session optional pam_loginuid.so@g' /etc/pam.d/sshd || true
+ 
+    # Add SSH settings required by the OOD SSH workflow.
+    # The root password is not stored in this image.
+    {
+        echo ''
+        echo '# ------------------------------------------------------------'
+        echo '# Container SSH settings for Open OnDemand Container SSHD'
+        echo '# ------------------------------------------------------------'
+        echo 'PermitRootLogin yes'
+        echo 'PasswordAuthentication yes'
+        echo 'UsePAM yes'
+        echo 'PermitEmptyPasswords no'
+        echo 'X11Forwarding no'
+        echo 'PrintMotd no'
+        echo 'AcceptEnv LANG LC_*'
+    } >> /etc/ssh/sshd_config
+ 
+    # Validate SSH server config.
+    /usr/sbin/sshd -t
+ 
+    # Do not upgrade pip by default in NVIDIA framework images.
+    # Upgrade pip only if your project really needs it.
+    # Example:
+    # python -m pip install --upgrade pip
+ 
+    # Optional: install project-specific Python packages here.
+    # Keep these lines commented unless your project needs them.
+    # Example:
+    # pip install imgaug==0.4.0
+    pip install requests==2.34.2
+    pip install chromadb==1.5.9
+ 
+    # Clean apt cache.
+    apt-get clean
+    rm -rf /var/lib/apt/lists/*
+ 
+%environment
+    export LC_ALL=C.UTF-8
+    export LANG=C.UTF-8
+    export PATH=/opt/conda/bin:$PATH
+ 
+%runscript
+    # Start sshd when running the container.
+    mkdir -p /var/run/sshd
+    chown root:root /var/run/sshd
+    chmod 0755 /var/run/sshd
+    ssh-keygen -A
+    exec /usr/sbin/sshd -D -e
+ 
+%startscript
+    # Start sshd when starting the container as an instance.
+    mkdir -p /var/run/sshd
+    chown root:root /var/run/sshd
+    chmod 0755 /var/run/sshd
+    ssh-keygen -A
+    exec /usr/sbin/sshd -D -e
+ 
+%test
+    # Check SSH config.
+    /usr/sbin/sshd -t
+ 
+    # Optional PyTorch and CUDA visibility test.
+    python - <<'PY'
+import torch
+ 
+print("PyTorch:", torch.__version__)
+print("CUDA available:", torch.cuda.is_available())
+ 
+if torch.cuda.is_available():
+    print("CUDA device count:", torch.cuda.device_count())
+    print("CUDA device 0:", torch.cuda.get_device_name(0))
+PY

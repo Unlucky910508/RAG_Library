@@ -8,6 +8,3 @@ config/github_token.txt
 # Holds an API key, and stays out of the way of pulls: copy
 # AI_server_config.template.py to create it.
 config/AI_server_config.py
-# Container definitions describe the machine the pipeline runs on, not the
-# pipeline: base images, internal registries, proxy settings.
-*.def
