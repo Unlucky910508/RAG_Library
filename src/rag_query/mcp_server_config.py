@@ -18,11 +18,10 @@ of the paths below rather than something looked up at runtime.
 #   raw_text/  the records a hit is answered from, from the parse steps
 CHROMA_PATH = "../../data/pycolmap_4.1.0/chroma"
 RECORDS_DIR = "../../data/pycolmap_4.1.0/raw_text"
+# The collection inside that store, not the store itself: one store can
+# hold several. A name that is not there is an error rather than a new
+# empty collection - see get_collection in search.py.
 COLLECTION_NAME = "pycolmap_4.1.0"
-# Must match what the store was built with. Chroma fixes this when a
-# collection is created, so a mismatch here is not corrected, it just
-# ranks differently than the data was indexed for.
-CHROMA_DISTANCE_METRIC = "cosine"
 
 # --- The embedding server ---------------------------------------------
 # A query has to be embedded by the same model the chunks were, or the

@@ -3,7 +3,7 @@ collection, and resolve each hit back to its record.
 
 Reads a dataset a pipeline run already produced and never introspects the
 library it describes, so nothing here needs that library installed.
-Everything it needs is in server_config.py beside it.
+Everything it needs is in mcp_server_config.py beside it.
 
 What comes back is assembled here from the matched chunk_type's
 return_fields (config.CHUNK_FIELDS), not read out of the vector DB - so a
@@ -23,9 +23,8 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from record_fields import build_text
-from server_config import (
+from mcp_server_config import (
     API_KEY,
-    CHROMA_DISTANCE_METRIC,
     CHROMA_PATH,
     CHUNK_FIELDS,
     COLLECTION_NAME,
@@ -66,7 +65,7 @@ def load_records_by_id():
     extra sources needs nothing declared here."""
     root = _resolve(RECORDS_DIR)
     if not root.is_dir():
-        raise FileNotFoundError(f"No records directory at {root} - check RECORDS_DIR in server_config.py")
+        raise FileNotFoundError(f"No records directory at {root} - check RECORDS_DIR in mcp_server_config.py")
     records_by_id = {}
     for path in sorted(root.glob("*.jsonl")):
         for record in read_jsonl(path):
@@ -77,14 +76,27 @@ def load_records_by_id():
 
 
 def get_collection():
+    """Open the collection named in the config, and fail if it is not
+    there.
+
+    get_or_create would answer a mistyped name by making an empty
+    collection and returning it, so every query would come back with
+    nothing and no error, having also left a stray collection in someone
+    else's store. Serving only ever reads, so it opens what exists and
+    says what does if the name is wrong."""
     store = _resolve(CHROMA_PATH)
     if not store.is_dir():
-        raise FileNotFoundError(f"No Chroma store at {store} - check CHROMA_PATH in server_config.py")
+        raise FileNotFoundError(f"No Chroma store at {store} - check CHROMA_PATH in mcp_server_config.py")
+
     client = chromadb.PersistentClient(path=str(store))
-    return client.get_or_create_collection(
-        name=COLLECTION_NAME,
-        metadata={"hnsw:space": CHROMA_DISTANCE_METRIC},
-    )
+    available = [c.name for c in client.list_collections()]
+    if COLLECTION_NAME not in available:
+        raise LookupError(
+            f"No collection {COLLECTION_NAME!r} in {store}. "
+            f"It holds: {', '.join(available) or 'nothing'}. "
+            "Check COLLECTION_NAME in mcp_server_config.py."
+        )
+    return client.get_collection(name=COLLECTION_NAME)
 
 
 def embed_query(text, api_key):

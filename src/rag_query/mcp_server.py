@@ -5,7 +5,7 @@ lives in search.py so it stays usable outside of MCP too.
 This directory stands alone: it reads nothing from the pipeline's config,
 imports nothing from the rest of the tree, and does not need the library
 it describes to be installed. Copy it somewhere with a built dataset,
-point server_config.py at that dataset, and run this.
+point mcp_server_config.py at that dataset, and run this.
 """
 
 import sys
@@ -17,7 +17,7 @@ from pydantic import Field
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import search as rag_search
-from server_config import API_KEY, LIBRARY_NAME, MAX_TOP_K, SERVER_NAME
+from mcp_server_config import API_KEY, LIBRARY_NAME, MAX_TOP_K, SERVER_NAME
 
 mcp = MCPServer(name=SERVER_NAME)
 
