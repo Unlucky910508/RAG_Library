@@ -90,7 +90,7 @@ python src/parse_library/parse_api.py
 ```
 Walks the target module (pycolmap) via `dir()`/`inspect` and writes one
 record per public API (module/class/function/method/property/enum_member/
-constant) to `data/pycolmap_{version}_api.jsonl`.
+constant) to `raw_text/api.jsonl`.
 
 ```bash
 python src/parse_library/filter_api_records.py --exclude
@@ -129,8 +129,8 @@ python src/parse_library/fetch_official_example_code.py
 ```
 Downloads the official example scripts at the tag matching the installed
 library version — never master, so example code can't drift ahead of the
-API records. Writes the `.py` files to
-`data/pycolmap_{version}_examples_src/` plus a `_manifest.json` recording
+API records. Writes the `.py` files to `src/official/` plus a
+`_manifest.json` recording
 each file's upstream URL, ref, and license. Everything in the directory
 is taken except `conftest.py`, which is pytest wiring; tests are kept,
 since a test living beside the examples drives them end to end and shows
@@ -159,13 +159,13 @@ resolution.
 ```bash
 python src/parse_library/parse_python_code.py
 ```
-Reads `.py` files (never the network) from every source directory listed
-in `config.code_sources()` — the official examples above, plus community
-code if it has been fetched — and splits each into per-function/class
-records plus a module-context record. Each source writes its own jsonl and
-prefixes its record names (`examples/…`, `community/…`) so a hit is
-traceable to where the code came from, and each stays separate from
-`parse_api.py`'s output so its rebuild can't wipe them. Every reference to
+Reads `.py` files (never the network) from **every directory under
+`src/`** — the official examples above, community code if fetched, and
+anything you put there yourself. Each directory becomes one
+`raw_text/<name>.jsonl` and lends its name as the prefix on those records
+(`official/…`, `community/…`), so a hit says where the code came from and
+no source can overwrite another. Each file splits into per-function/class
+records plus a module-context record. Every reference to
 the target library is statically resolved via `ast` against the API
 records into `apis_used`; unresolvable ones land in `unknown_refs` (zero
 for the official examples — that's the version-alignment check working).
@@ -193,9 +193,9 @@ python src/parse_library/fetch_community_code.py
 ```
 Searches grep.app for repositories importing the target library, adds
 licence and activity from GitHub's API, downloads the matching files and
-scores each one, keeping those that pass in
-`data/pycolmap_{version}_community_src/` (namespaced per repository, with
-a `_manifest.json` carrying each file's URL and licence). No credentials
+scores each one, keeping those that pass in `src/community/`
+(namespaced per repository, with a `_manifest.json` carrying each file's
+URL and licence). No credentials
 needed. Optionally, a GitHub token in `config/github_token.txt`
 (gitignored, no scopes required) raises the API limit from 60 requests an
 hour to 5000 — useful when re-running while tuning the filters.
@@ -225,8 +225,9 @@ because its BSD text carries a preamble), which is why
 `COMMUNITY_SEARCH_PAGES` is set generously: widening the search is
 cheaper than auditing licences after the fact.
 
-Every decision is recorded in
-`data/pycolmap_{version}_community_candidates.jsonl`. Downloading is not
+Every decision is recorded in `community_candidates.jsonl` at the library
+root — deliberately outside `raw_text/`, since anything there would be
+chunked and indexed. Downloading is not
 ingesting: **nothing reaches the dataset until you run
 `parse_python_code.py`**, so read that file and delete anything unwanted
 from the source directory first.
@@ -247,7 +248,7 @@ already-explained records are skipped.
 ```bash
 python src/rag_ingest/parse_chunks.py
 ```
-Splits each record (from every record file that exists) into one or more
+Splits each record (from **every jsonl in `raw_text/`**) into one or more
 embedding chunks — currently an `explanation` chunk (name + official
 docstring text + generated explanation), a `signature` chunk (name +
 signatures + parameter names), and an `example` chunk (name + APIs used +
@@ -283,8 +284,8 @@ line), calls a local OpenAI-compatible embeddings endpoint
 (`EMBEDDING_BASE_URL`/`EMBEDDING_MODEL` in `config/config.py`, defaults
 to the same server as `LLM_BASE_URL` with
 model `BAAI/bge-m3`) per chunk and loads the resulting
-vector straight into a Chroma collection at `data/chroma/` (one collection
-per pycolmap version, named via `chroma_collection_name()`, created with
+vector straight into the Chroma store at `chroma/` (one per library and
+version, created with
 `hnsw:space` set to `CHROMA_DISTANCE_METRIC` — `cosine` by default, matching
 what embedding models like `BAAI/bge-m3` are actually trained/evaluated
 for, instead of Chroma's default squared-L2 — this only takes effect when
