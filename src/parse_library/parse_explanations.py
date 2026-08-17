@@ -157,9 +157,6 @@ def enrich_with_explanations(records, api_key, path):
 
 def main():
     for path in record_jsonl_paths(__import__(parsed_module_name).__version__):
-        if not path.exists():
-            print(f"Skipping {path} (not generated yet)")
-            continue
         records = read_jsonl(path)
         enrich_with_explanations(records, API_KEY, path)
         print(f"Done. Wrote explanations to {path}")

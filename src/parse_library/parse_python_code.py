@@ -33,6 +33,8 @@ from config import (
     EXAMPLES_MANIFEST_NAME,
     api_jsonl_path,
     code_sources,
+    raw_text_dir,
+    src_dir,
     parsed_module_name,
 )
 
@@ -200,12 +202,14 @@ def main():
     version = __import__(parsed_module_name).__version__
     known_names = {r["name"] for r in read_jsonl(api_jsonl_path(version))}
 
-    for source in code_sources(version):
-        source_dir = source["src_dir"]
-        if not source_dir.exists():
-            print(f"Skipping {source_dir.name} (nothing fetched there yet)")
-            continue
+    sources = code_sources(version)
+    if not sources:
+        print(f"No source directories under {src_dir(version)} - nothing to parse")
+        return
+    raw_text_dir(version).mkdir(parents=True, exist_ok=True)
 
+    for source in sources:
+        source_dir = source["src_dir"]
         print(f"{source_dir.name}:")
         records = parse_source_dir(source_dir, parsed_module_name, known_names, source["name_prefix"])
         write_jsonl(records, source["jsonl"])

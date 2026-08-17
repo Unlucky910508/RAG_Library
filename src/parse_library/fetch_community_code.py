@@ -57,7 +57,7 @@ from config import (
     api_jsonl_path,
     community_candidates_path,
     community_src_dir,
-    examples_src_dir,
+    official_src_dir,
     load_github_token,
     parsed_module_name,
 )
@@ -140,7 +140,7 @@ def official_source(version):
     which made comparing against them silently match nothing and let the
     official examples through as community finds. The manifest records
     what was really downloaded, so it cannot drift from it."""
-    manifest_path = examples_src_dir(version) / EXAMPLES_MANIFEST_NAME
+    manifest_path = official_src_dir(version) / EXAMPLES_MANIFEST_NAME
     if not manifest_path.exists():
         return None
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))

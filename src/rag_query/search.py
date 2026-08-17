@@ -51,9 +51,8 @@ def read_jsonl(path):
 def load_records_by_id(version):
     records_by_id = {}
     for path in record_jsonl_paths(version):
-        if path.exists():
-            for record in read_jsonl(path):
-                records_by_id[record["name"]] = record
+        for record in read_jsonl(path):
+            records_by_id[record["name"]] = record
     return records_by_id
 
 

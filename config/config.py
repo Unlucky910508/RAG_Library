@@ -58,10 +58,6 @@ EXAMPLES_DIR_CONVENTIONS = (
 EXAMPLES_MANIFEST_NAME = "_manifest.json"
 
 
-def examples_src_dir(version):
-    return DATA_DIR / f"{parsed_module_name}_{version}_examples_src"
-
-
 # Community code that uses this library, for fetch_community_code.py.
 # Trust here is not taken from stars or reputation: those are only coarse
 # prefilters to keep the candidate set small. The decisive test is the static
@@ -123,14 +119,54 @@ COMMUNITY_MIN_APIS_PER_FUNCTION = 3
 COMMUNITY_MAX_UNKNOWN_REFS = 0
 
 
-def community_candidates_path(version):
-    """A record of what the fetch kept and what it turned away, written
-    alongside the sources so its decisions can be reviewed."""
-    return DATA_DIR / f"{parsed_module_name}_{version}_community_candidates.jsonl"
+# Everything generated for one library at one version lives under a single
+# directory, split by what the contents are rather than by which script
+# wrote them:
+#
+#   <module>_<version>/
+#     src/              .py files, one directory per source
+#       official/       from fetch_official_example_code.py
+#       community/      from fetch_community_code.py
+#       <yours>/        anything you put there
+#     raw_text/         one jsonl of records per source, plus api.jsonl
+#     chunked_text/     the same, split into embedding chunks
+#     chroma/           the vector store
+#
+# The steps between those directories work by looking at what is there,
+# not by consulting a list here, so a directory you create under src/ is
+# parsed and a jsonl you write into raw_text/ is chunked without anything
+# being registered first.
+
+
+def library_dir(version):
+    return DATA_DIR / f"{parsed_module_name}_{version}"
+
+
+def src_dir(version):
+    return library_dir(version) / "src"
+
+
+def raw_text_dir(version):
+    return library_dir(version) / "raw_text"
+
+
+def chunked_text_dir(version):
+    return library_dir(version) / "chunked_text"
+
+
+def official_src_dir(version):
+    return src_dir(version) / "official"
 
 
 def community_src_dir(version):
-    return DATA_DIR / f"{parsed_module_name}_{version}_community_src"
+    return src_dir(version) / "community"
+
+
+def community_candidates_path(version):
+    """What the community fetch kept and what it turned away. Deliberately
+    outside raw_text/, which holds records: this is a report about a fetch,
+    and anything in raw_text/ would be chunked and indexed."""
+    return library_dir(version) / "community_candidates.jsonl"
 
 
 def api_filter_path(version, mode):
@@ -141,63 +177,50 @@ def api_filter_path(version, mode):
 
 
 def api_jsonl_path(version):
-    return DATA_DIR / f"{parsed_module_name}_{version}_api.jsonl"
-
-
-def examples_jsonl_path(version):
-    return DATA_DIR / f"{parsed_module_name}_{version}_examples.jsonl"
-
-
-def community_jsonl_path(version):
-    return DATA_DIR / f"{parsed_module_name}_{version}_community.jsonl"
+    return raw_text_dir(version) / "api.jsonl"
 
 
 def code_sources(version):
-    """Directories of .py files parse_python_code.py turns into records,
-    each with the prefix its record names carry so a hit is traceable to
-    where the code came from. Add a source here once some fetch_* script
-    writes the same directory layout."""
+    """Every directory under src/, each becoming one records file named
+    after it. The directory name is also the prefix its records carry, so
+    a hit says where the code came from."""
+    root = src_dir(version)
+    if not root.exists():
+        return []
     return [
         {
-            "src_dir": examples_src_dir(version),
-            "jsonl": examples_jsonl_path(version),
-            "name_prefix": "examples",
-        },
-        {
-            "src_dir": community_src_dir(version),
-            "jsonl": community_jsonl_path(version),
-            "name_prefix": "community",
-        },
+            "src_dir": directory,
+            "jsonl": raw_text_dir(version) / f"{directory.name}.jsonl",
+            "name_prefix": directory.name,
+        }
+        for directory in sorted(root.iterdir())
+        if directory.is_dir()
     ]
 
 
 def record_jsonl_paths(version):
-    """All record files that make up the dataset. Downstream steps
-    (explanations, chunking, search) iterate whichever of these exist."""
-    return [api_jsonl_path(version)] + [s["jsonl"] for s in code_sources(version)]
+    """Every records file. Read from disk rather than assembled from a
+    list, so a jsonl written there by hand is picked up like any other."""
+    root = raw_text_dir(version)
+    return sorted(root.glob("*.jsonl")) if root.exists() else []
 
 
-def chunks_jsonl_path_for(record_jsonl_path):
-    """The chunk file paired with a record file, derived from its name:
-    ..._api.jsonl -> ..._api_chunks.jsonl. A future record source gets its
-    own chunk file automatically, no config edit needed."""
-    return record_jsonl_path.with_name(record_jsonl_path.stem + "_chunks.jsonl")
+def chunks_jsonl_path_for(record_jsonl_path, version):
+    """The chunk file for a records file: same name, _chunks appended,
+    under chunked_text/."""
+    return chunked_text_dir(version) / f"{record_jsonl_path.stem}_chunks.jsonl"
 
 
 def chunk_jsonl_paths(version):
-    """All chunk files. Consumers (load_vectordb) iterate whichever exist."""
-    return [chunks_jsonl_path_for(p) for p in record_jsonl_paths(version)]
+    """Every chunk file, again by looking rather than by listing."""
+    root = chunked_text_dir(version)
+    return sorted(root.glob("*.jsonl")) if root.exists() else []
 
 
-# A function, not a constant, because the version is only known once the
-# target library has been imported - which cannot happen while this module
-# is still being defined.
 def chroma_dir(version):
-    """One database per library and version. Chroma can hold several
-    collections in one store, but keeping them apart means a rebuild for
-    one library is a directory to delete rather than a collection to find,
-    and no cross-version state can outlive the data it came from."""
-    return DATA_DIR / f"chroma_{parsed_module_name}_{version}"
+    """One store per library and version, alongside the data it indexes,
+    so a rebuild is a directory to delete."""
+    return library_dir(version) / "chroma"
 
 
 # BAAI/bge-m3 (like most embedding models) is trained/evaluated for cosine

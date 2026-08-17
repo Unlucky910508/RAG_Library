@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from config import parsed_module_name, DATA_DIR, api_jsonl_path
+from config import api_jsonl_path, parsed_module_name, raw_text_dir
 
 
 def is_public(name):
@@ -85,7 +85,7 @@ def write_jsonl(records, output_path):
 def main():
     root = __import__(parsed_module_name)
 
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    raw_text_dir(root.__version__).mkdir(parents=True, exist_ok=True)
     output_file = api_jsonl_path(root.__version__)
 
     records = collect_apis(root, parsed_module_name)

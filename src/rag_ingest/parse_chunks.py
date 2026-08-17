@@ -21,7 +21,14 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from config import CHUNK_FIELDS, chunks_jsonl_path_for, parsed_module_name, record_jsonl_paths
+from config import (
+    CHUNK_FIELDS,
+    chunked_text_dir,
+    chunks_jsonl_path_for,
+    parsed_module_name,
+    raw_text_dir,
+    record_jsonl_paths,
+)
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "common"))
 from record_fields import build_text, has_required_fields
@@ -50,15 +57,20 @@ def build_chunks(record):
 
 
 def main():
-    for record_path in record_jsonl_paths(__import__(parsed_module_name).__version__):
-        if not record_path.exists():
-            print(f"Skipping {record_path} (not generated yet)")
-            continue
+    version = __import__(parsed_module_name).__version__
+
+    record_paths = record_jsonl_paths(version)
+    if not record_paths:
+        print(f"No records under {raw_text_dir(version)} - nothing to chunk")
+        return
+    chunked_text_dir(version).mkdir(parents=True, exist_ok=True)
+
+    for record_path in record_paths:
         records = read_jsonl(record_path)
         chunks = []
         for record in records:
             chunks.extend(build_chunks(record))
-        output_path = chunks_jsonl_path_for(record_path)
+        output_path = chunks_jsonl_path_for(record_path, version)
         write_jsonl(chunks, output_path)
         print(f"Wrote {len(chunks)} chunks from {len(records)} records to {output_path}")
 

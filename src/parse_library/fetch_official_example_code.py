@@ -44,7 +44,7 @@ from config import (
     EXAMPLES_LICENSE,
     EXAMPLES_MANIFEST_NAME,
     EXAMPLES_PATH_IN_REPO,
-    examples_src_dir,
+    official_src_dir,
     VERIFY_SSL,
     load_github_token,
     parsed_module_name,
@@ -273,7 +273,7 @@ def main():
     for field in ("repo", "ref", "path", "license"):
         print(f"  {field:8} {source[field]}  ({origins[field]})")
 
-    dest_dir = examples_src_dir(version)
+    dest_dir = official_src_dir(version)
     files = download_examples(source, dest_dir, token)
     print(f"Downloaded {len(files)} example files to {dest_dir}")
 

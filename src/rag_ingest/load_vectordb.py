@@ -29,6 +29,7 @@ from config import (
     chroma_collection_name,
     chroma_dir,
     chunk_jsonl_paths,
+    chunked_text_dir,
     parsed_module_name,
 )
 
@@ -129,14 +130,16 @@ def load_chunks(collection, chunks, api_key):
 def main():
     version = __import__(parsed_module_name).__version__
 
+    chunk_paths = chunk_jsonl_paths(version)
+    if not chunk_paths:
+        print(f"No chunks under {chunked_text_dir(version)} - run parse_chunks.py first")
+        return
+
     chunks = []
-    for path in chunk_jsonl_paths(version):
-        if path.exists():
-            file_chunks = read_jsonl(path)
-            chunks.extend(file_chunks)
-            print(f"Read {len(file_chunks)} chunks from {path.name}")
-        else:
-            print(f"Skipping {path} (not generated yet)")
+    for path in chunk_paths:
+        file_chunks = read_jsonl(path)
+        chunks.extend(file_chunks)
+        print(f"Read {len(file_chunks)} chunks from {path.name}")
 
     client = chromadb.PersistentClient(path=str(chroma_dir(version)))
     collection = client.get_or_create_collection(
