@@ -1,6 +1,11 @@
-"""MCP server exposing RAG search over the target library's dataset to a
+"""MCP server exposing RAG search over an already-built dataset to a
 coding agent. Thin protocol layer only - all the actual search logic
 lives in search.py so it stays usable outside of MCP too.
+
+This directory stands alone: it reads nothing from the pipeline's config,
+imports nothing from the rest of the tree, and does not need the library
+it describes to be installed. Copy it somewhere with a built dataset,
+point server_config.py at that dataset, and run this.
 """
 
 import sys
@@ -10,13 +15,11 @@ from typing import Annotated
 from mcp.server import MCPServer
 from pydantic import Field
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from config import API_KEY, MAX_TOP_K, parsed_module_name
-
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import search as rag_search
+from server_config import API_KEY, LIBRARY_NAME, MAX_TOP_K, SERVER_NAME
 
-mcp = MCPServer(name=f"{parsed_module_name}-rag")
+mcp = MCPServer(name=SERVER_NAME)
 
 
 # Stated as a description rather than a Field(le=...) bound: a bound makes
@@ -34,7 +37,7 @@ TopK = Annotated[
 # registration time, so assigning __doc__ afterwards would not reach the
 # tool the model sees.
 SEARCH_DESCRIPTION = (
-    f"Search the {parsed_module_name} API and official example code for entries "
+    f"Search the {LIBRARY_NAME} API and official example code for entries "
     "matching a natural-language or code-shaped query. Returns up to "
     f"{MAX_TOP_K} matches, each with the text for that kind of match: API "
     "signatures and explanation, or example source code.\n\n"
@@ -50,10 +53,11 @@ def search_rag(query: str, top_k: TopK = MAX_TOP_K) -> list[dict]:
 
 
 def load_state():
-    version = __import__(parsed_module_name).__version__
+    """Opened once at startup rather than per query - the records are a
+    few thousand lines of jsonl and the store a directory handle."""
     return {
-        "collection": rag_search.get_collection(version),
-        "records_by_id": rag_search.load_records_by_id(version),
+        "collection": rag_search.get_collection(),
+        "records_by_id": rag_search.load_records_by_id(),
         "api_key": API_KEY,
     }
 

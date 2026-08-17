@@ -1,6 +1,10 @@
 """Core RAG search logic: embed a query, look it up in the Chroma
 collection, and resolve each hit back to its record.
 
+Reads a dataset a pipeline run already produced and never introspects the
+library it describes, so nothing here needs that library installed.
+Everything it needs is in server_config.py beside it.
+
 What comes back is assembled here from the matched chunk_type's
 return_fields (config.CHUNK_FIELDS), not read out of the vector DB - so a
 chunk can be matched on one kind of text and answered with another, and
@@ -17,22 +21,30 @@ from pathlib import Path
 import chromadb
 import requests
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from config import (
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from record_fields import build_text
+from server_config import (
     API_KEY,
     CHROMA_DISTANCE_METRIC,
+    CHROMA_PATH,
     CHUNK_FIELDS,
+    COLLECTION_NAME,
     EMBEDDING_BASE_URL,
     EMBEDDING_MODEL,
-    VERIFY_SSL,
     MAX_TOP_K,
-    chroma_collection_name,
-    chroma_dir,
-    record_jsonl_paths,
+    RECORDS_DIR,
+    VERIFY_SSL,
 )
 
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "common"))
-from record_fields import build_text
+HERE = Path(__file__).resolve().parent
+
+
+def _resolve(path):
+    """Settings may be relative, and are then read relative to this
+    directory rather than to wherever the server happened to be started
+    from - so a copied folder works the same however it is launched."""
+    path = Path(path)
+    return path if path.is_absolute() else (HERE / path).resolve()
 
 if VERIFY_SSL is False:
     requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
@@ -48,18 +60,29 @@ def read_jsonl(path):
         return [json.loads(line) for line in f if line.strip()]
 
 
-def load_records_by_id(version):
+def load_records_by_id():
+    """Every record, keyed by name: a hit names one and is answered from
+    it. Reads whatever jsonl is in RECORDS_DIR, so a dataset built with
+    extra sources needs nothing declared here."""
+    root = _resolve(RECORDS_DIR)
+    if not root.is_dir():
+        raise FileNotFoundError(f"No records directory at {root} - check RECORDS_DIR in server_config.py")
     records_by_id = {}
-    for path in record_jsonl_paths(version):
+    for path in sorted(root.glob("*.jsonl")):
         for record in read_jsonl(path):
             records_by_id[record["name"]] = record
+    if not records_by_id:
+        raise FileNotFoundError(f"No .jsonl records under {root}")
     return records_by_id
 
 
-def get_collection(version):
-    client = chromadb.PersistentClient(path=str(chroma_dir(version)))
+def get_collection():
+    store = _resolve(CHROMA_PATH)
+    if not store.is_dir():
+        raise FileNotFoundError(f"No Chroma store at {store} - check CHROMA_PATH in server_config.py")
+    client = chromadb.PersistentClient(path=str(store))
     return client.get_or_create_collection(
-        name=chroma_collection_name(version),
+        name=COLLECTION_NAME,
         metadata={"hnsw:space": CHROMA_DISTANCE_METRIC},
     )
 

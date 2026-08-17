@@ -1,0 +1,6 @@
+# Serving an already-built dataset. No target library: nothing here
+# introspects it, the dataset is read off disk.
+requests==2.34.2
+chromadb==1.5.9
+mcp==2.0.0
+pydantic==2.13.4
