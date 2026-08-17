@@ -313,14 +313,14 @@ CHUNK_FIELDS = {
     # "Vela Performance Estimations > Estimated memory bandwidth >
     # Average bandwidth" is what they meant.
     "doc_section": {
-        "embedding_fields": ["name", "heading_path", "doc"],
-        # heading_path as well as doc, and only markdown records carry it.
-        # Recipes match on which fields a record has rather than on what
-        # kind it is, so requiring only doc would take in every API record
-        # with a docstring - duplicating, under a name that misdescribes
-        # them, what the explanation chunk already covers.
-        "required": ["doc", "heading_path"],
-        "return_fields": ["name", "heading_path", "doc", "source"],
+        "embedding_fields": ["name", "heading_path", "section_text"],
+        # section_text, not doc: a docstring read off a library object and
+        # the prose under a heading in a documentation file are different
+        # things, and recipes match on which fields a record has rather
+        # than on what kind it is. Naming both "doc" was enough to make
+        # this recipe apply to every API record that had one.
+        "required": ["section_text"],
+        "return_fields": ["name", "heading_path", "section_text", "source"],
     },
 }
 

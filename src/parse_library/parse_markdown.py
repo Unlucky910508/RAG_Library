@@ -16,6 +16,12 @@ opening prose is the most useful text in the file - what the tool is, how
 to get started, what the output means. Only the deepest sections carry the
 detail; the shallow ones carry the orientation.
 
+The body lands in a "section_text" field rather than "doc". A docstring
+read off a library object and the prose under a heading in a documentation
+file are not the same thing, and chunk recipes select records by which
+fields they have - so one name for both would have made any recipe naming
+it apply to both kinds at once.
+
 **Each record's heading path is stored with it**, since a section title
 often means nothing alone. "Average bandwidth" is not a question anyone
 asks. "Vela Performance Estimations > Estimated memory bandwidth > Average
@@ -167,7 +173,7 @@ def parse_markdown_file(path, name_prefix, relative_name):
             "kind": "doc_section",
             "heading_path": paths[index],
             "heading_level": level,
-            "doc": body,
+            "section_text": body,
             "source": f"{relative_name}#L{line_number}-L{end}",
         }
         code = extract_code_blocks(body_lines)

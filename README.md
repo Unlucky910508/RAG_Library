@@ -228,6 +228,11 @@ is usually the most useful text in the file: what the tool is, how to get
 started, what the output means. Only the deepest sections carry detail;
 the shallow ones carry orientation.
 
+The body goes in a `section_text` field, **not `doc`** — that one holds a
+docstring read off a library object, and the two are different things.
+Since recipes select records by which fields they have, one name for both
+would be enough to make any recipe naming it apply to both kinds at once.
+
 Each record stores its **heading path**, which is also embedded, because a
 section title often means nothing alone — "Average bandwidth" is not a
 question anyone asks, while "Vela Performance Estimations > Estimated
@@ -330,12 +335,21 @@ lists, all drawn from the field vocabulary in
 
 Recipes match on **which fields a record has, not what kind of record it
 is** — which is what lets a new record source need no config change, and
-is also the thing to watch when adding one. List in `required` every field
-the chunk genuinely depends on, including the ones that merely make it
-distinctive: a recipe requiring less than it embeds will quietly apply to
-records it was never meant for, and the resulting chunk embeds whatever is
-left — often just the name, which matches every query weakly and answers
-none of them.
+is what to keep in mind when adding one.
+
+**A field name is what separates one kind of content from another, so two
+things that are not the same must not share one.** `doc` holds a docstring
+read off a library object; the prose under a heading in a documentation
+file is `section_text`. Calling both `doc` was enough to make the
+documentation recipe silently apply to every API record that had one — and
+no `required` list can undo that, because by then the two are
+indistinguishable.
+
+Given distinct names, `required` is just honesty about what a chunk needs:
+list every field it depends on, including the ones that merely make it
+distinctive. A recipe requiring less than it embeds applies to records
+where those fields are absent, and the chunk then embeds whatever is left —
+often just the name, which matches every query weakly and answers none.
 
 Splitting embedding from return means a chunk can be *found* by one kind
 of text and *answered* with another. Recombining existing fields is a

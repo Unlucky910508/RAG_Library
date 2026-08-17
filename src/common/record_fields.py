@@ -40,6 +40,16 @@ def extract_heading_path(record):
     return " > ".join(path) if path else None
 
 
+def extract_section_text(record):
+    """The body of a documentation section.
+
+    Deliberately not called "doc": that field holds a docstring read off a
+    library object, and this holds prose from a documentation file. Sharing
+    one name would make every recipe naming it apply to both, which is not
+    something a recipe can then take back."""
+    return record.get("section_text")
+
+
 def extract_source(record):
     source = record.get("source")
     return f"source: {source}" if source else None
@@ -86,6 +96,7 @@ FIELD_EXTRACTORS = {
     "doc": extract_doc,
     "code": extract_code,
     "heading_path": extract_heading_path,
+    "section_text": extract_section_text,
     "source": extract_source,
     "license": extract_license,
     "signatures": extract_signatures,
