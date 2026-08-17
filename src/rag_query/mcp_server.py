@@ -4,8 +4,9 @@ lives in search.py so it stays usable outside of MCP too.
 
 This directory stands alone: it reads nothing from the pipeline's config,
 imports nothing from the rest of the tree, and does not need the library
-it describes to be installed. Copy it somewhere with a built dataset,
-point mcp_server_config.py at that dataset, and run this.
+it describes to be installed. Copy it somewhere with a Chroma store, point mcp_server_config.py at
+that store, and run this - the store carries the answers as well as the
+vectors, so nothing else travels with it.
 """
 
 import sys
@@ -49,15 +50,13 @@ SEARCH_DESCRIPTION = (
 
 @mcp.tool(description=SEARCH_DESCRIPTION)
 def search_rag(query: str, top_k: TopK = MAX_TOP_K) -> list[dict]:
-    return rag_search.search(query, mcp_state["collection"], mcp_state["records_by_id"], mcp_state["api_key"], top_k=top_k)
+    return rag_search.search(query, mcp_state["collection"], mcp_state["api_key"], top_k=top_k)
 
 
 def load_state():
-    """Opened once at startup rather than per query - the records are a
-    few thousand lines of jsonl and the store a directory handle."""
+    """Opened once at startup rather than per query."""
     return {
         "collection": rag_search.get_collection(),
-        "records_by_id": rag_search.load_records_by_id(),
         "api_key": API_KEY,
     }
 

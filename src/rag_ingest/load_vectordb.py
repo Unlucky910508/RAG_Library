@@ -2,8 +2,9 @@
 not local to this machine) and load it straight into a Chroma collection.
 
 The raw vector is never written back to the chunks jsonl - it's only
-meaningful to a vector index, so it goes directly into Chroma alongside
-the chunk's text and metadata. A chunk is skipped only if its chunk_id
+meaningful to a vector index, so it goes directly into Chroma. Stored
+alongside it is the chunk's return_text, the text a hit is answered with,
+which leaves the store self-contained: serving needs it and nothing else. A chunk is skipped only if its chunk_id
 already exists in the collection AND its text is unchanged (compared via
 a stored hash) - a new chunk_id gets added, and an existing chunk_id whose
 text changed (edited explanation, a chunk_type's field recipe changed,
@@ -49,8 +50,13 @@ def chunk_id(chunk):
     return f"{chunk['record_id']}::{chunk['chunk_type']}"
 
 
-def text_hash(text):
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+def text_hash(chunk):
+    """Covers both texts, so editing a return_fields recipe reloads the
+    chunk even though what it is embedded on has not moved. Hashing only
+    the embedded text would leave the stored answer stale - the more
+    confusing failure, since retrieval would still look right."""
+    payload = chunk["text"] + "\x00" + chunk.get("return_text", "")
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
 
 
 def call_embedding(text, api_key):
@@ -91,7 +97,7 @@ def fetch_existing_hashes(collection, ids):
 
 def find_changed_or_new_chunks(collection, chunks):
     existing_hashes = fetch_existing_hashes(collection, [chunk_id(c) for c in chunks])
-    return [c for c in chunks if existing_hashes.get(chunk_id(c)) != text_hash(c["text"])]
+    return [c for c in chunks if existing_hashes.get(chunk_id(c)) != text_hash(c)]
 
 
 def load_chunks(collection, chunks, api_key):
@@ -113,11 +119,13 @@ def load_chunks(collection, chunks, api_key):
         if embedding:
             batch_ids.append(chunk_id(chunk))
             batch_embeddings.append(embedding)
-            batch_documents.append(chunk["text"])
+            # The document is what a hit is answered with, not what it was
+            # found by: the store then holds everything a search needs.
+            batch_documents.append(chunk.get("return_text") or chunk["text"])
             batch_metadatas.append({
                 "record_id": chunk["record_id"],
                 "chunk_type": chunk["chunk_type"],
-                "text_hash": text_hash(chunk["text"]),
+                "text_hash": text_hash(chunk),
             })
             print(f"  [{i + 1}/{len(pending)}] {chunk['record_id']} ({chunk['chunk_type']})")
 

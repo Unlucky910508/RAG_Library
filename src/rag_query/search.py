@@ -5,10 +5,12 @@ Reads a dataset a pipeline run already produced and never introspects the
 library it describes, so nothing here needs that library installed.
 Everything it needs is in mcp_server_config.py beside it.
 
-What comes back is assembled here from the matched chunk_type's
-return_fields (config.CHUNK_FIELDS), not read out of the vector DB - so a
-chunk can be matched on one kind of text and answered with another, and
-editing a recipe takes effect on the next query without re-embedding.
+What comes back is the document stored beside each vector, which
+load_vectordb.py wrote from the chunk's return_text. A chunk is still
+found by one text and answered with another; the difference is that the
+answer was settled when the store was built, so the store is all serving
+needs. Changing a return_fields recipe means rebuilding rather than
+taking effect on the next question.
 
 Kept free of any MCP dependency so it's importable by anything - an MCP
 server, a CLI, a test script, a future different kind of RAG consumer.
@@ -22,16 +24,13 @@ import chromadb
 import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from record_fields import build_text
 from mcp_server_config import (
     API_KEY,
     CHROMA_PATH,
-    CHUNK_FIELDS,
     COLLECTION_NAME,
     EMBEDDING_BASE_URL,
     EMBEDDING_MODEL,
     MAX_TOP_K,
-    RECORDS_DIR,
     VERIFY_SSL,
 )
 
@@ -52,27 +51,6 @@ if VERIFY_SSL is False:
 # and "signature") down to one hit per record_id, so more raw chunk
 # matches than top_k are pulled to still surface top_k distinct records.
 OVERFETCH_MULTIPLIER = 3
-
-
-def read_jsonl(path):
-    with open(path, "r", encoding="utf-8") as f:
-        return [json.loads(line) for line in f if line.strip()]
-
-
-def load_records_by_id():
-    """Every record, keyed by name: a hit names one and is answered from
-    it. Reads whatever jsonl is in RECORDS_DIR, so a dataset built with
-    extra sources needs nothing declared here."""
-    root = _resolve(RECORDS_DIR)
-    if not root.is_dir():
-        raise FileNotFoundError(f"No records directory at {root} - check RECORDS_DIR in mcp_server_config.py")
-    records_by_id = {}
-    for path in sorted(root.glob("*.jsonl")):
-        for record in read_jsonl(path):
-            records_by_id[record["name"]] = record
-    if not records_by_id:
-        raise FileNotFoundError(f"No .jsonl records under {root}")
-    return records_by_id
 
 
 def get_collection():
@@ -115,38 +93,34 @@ def embed_query(text, api_key):
     return response.json()["data"][0]["embedding"]
 
 
-def build_return_text(record, chunk_type):
-    """Render the record through the matched chunk_type's return_fields.
-    Falls back to the embedding_fields if a recipe defines no return of
-    its own, so a half-configured chunk_type still answers with something."""
-    if record is None:
-        return None
-    spec = CHUNK_FIELDS.get(chunk_type, {})
-    field_keys = spec.get("return_fields") or spec.get("embedding_fields", [])
-    return build_text(record, field_keys)
-
-
-def search(query, collection, records_by_id, api_key, top_k=MAX_TOP_K):
+def search(query, collection, api_key, top_k=MAX_TOP_K):
     # Clamped rather than rejected: callers are usually models, and an
     # over-eager top_k should still get an answer. Enforced here rather
     # than in the MCP layer so every consumer of this module is covered.
     top_k = max(1, min(top_k, MAX_TOP_K))
     query_embedding = embed_query(query, api_key)
-    results = collection.query(query_embeddings=[query_embedding], n_results=top_k * OVERFETCH_MULTIPLIER)
+    results = collection.query(
+        query_embeddings=[query_embedding],
+        n_results=top_k * OVERFETCH_MULTIPLIER,
+        include=["metadatas", "distances", "documents"],
+    )
 
     hits = []
     seen_record_ids = set()
-    for metadata, distance in zip(results["metadatas"][0], results["distances"][0]):
+    for metadata, distance, document in zip(
+        results["metadatas"][0], results["distances"][0], results["documents"][0]
+    ):
         record_id = metadata["record_id"]
         if record_id in seen_record_ids:
             continue
         seen_record_ids.add(record_id)
-        chunk_type = metadata["chunk_type"]
         hits.append({
             "record_id": record_id,
-            "matched_chunk_type": chunk_type,
+            "matched_chunk_type": metadata["chunk_type"],
             "distance": distance,
-            "text": build_return_text(records_by_id.get(record_id), chunk_type),
+            # Written when the store was built, so answering needs nothing
+            # beyond the store itself.
+            "text": document,
         })
         if len(hits) == top_k:
             break

@@ -46,13 +46,32 @@ def write_jsonl(records, path):
 
 
 def build_chunks(record):
+    """Both texts for a chunk: the one it is found by, and the one it is
+    answered with.
+
+    The answer is rendered here rather than at query time so that it can
+    be stored in the vector database, which then holds everything a
+    search needs. That is what lets the serving side be handed over as a
+    directory and a store, with no records file beside it.
+
+    The cost is that changing a return_fields recipe means running this
+    and load_vectordb.py again, where assembling at query time would have
+    taken effect on the next question."""
     chunks = []
     for chunk_type, spec in CHUNK_FIELDS.items():
         if not has_required_fields(record, spec["required"]):
             continue
         text = build_text(record, spec["embedding_fields"])
-        if text:
-            chunks.append({"record_id": record["name"], "chunk_type": chunk_type, "text": text})
+        if not text:
+            continue
+        chunks.append({
+            "record_id": record["name"],
+            "chunk_type": chunk_type,
+            "text": text,
+            # Falls back to the embedded text so a recipe without a return
+            # of its own still answers with something.
+            "return_text": build_text(record, spec.get("return_fields") or spec["embedding_fields"]) or text,
+        })
     return chunks
 
 

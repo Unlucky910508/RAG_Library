@@ -6,18 +6,16 @@ the pipeline's config/ and imports nothing from the rest of the tree.
 What it needs is stated here as plain values.
 
 Nor does it need the library it describes to be installed: serving reads
-a dataset off disk and never introspects anything, so the version is part
-of the paths below rather than something looked up at runtime.
+a store off disk and never introspects anything, so the version is part
+of the path below rather than something looked up at runtime.
 """
 
 # --- The dataset ------------------------------------------------------
-# Both directories come from a pipeline run. Copy them alongside this
-# folder, or point at wherever they live; absolute paths are fine.
-#
-#   chroma/    the vector store, from load_vectordb.py
-#   raw_text/  the records a hit is answered from, from the parse steps
+# The Chroma store from load_vectordb.py, which holds the answers as well
+# as the vectors - so this is the only thing that travels with this
+# folder. Copy it alongside, or point at wherever it lives; absolute
+# paths are fine, relative ones are read from this directory.
 CHROMA_PATH = "../../data/pycolmap_4.1.0/chroma"
-RECORDS_DIR = "../../data/pycolmap_4.1.0/raw_text"
 # The collection inside that store, not the store itself: one store can
 # hold several. A name that is not there is an error rather than a new
 # empty collection - see get_collection in search.py.
@@ -40,26 +38,3 @@ SERVER_NAME = "pycolmap-rag"
 # Each hit carries a record's worth of text, so a caller asking for many
 # floods its own context. Requests above this are clamped, not refused.
 MAX_TOP_K = 5
-
-# --- How a hit is rendered --------------------------------------------
-# return_fields per chunk_type, drawn from the vocabulary in
-# record_fields.py. Only the return side matters here: what a chunk was
-# embedded on was settled when the store was built.
-#
-# Keep in step with CHUNK_FIELDS in the pipeline's config if you change
-# recipes there - this copy is what answers are built from, and nothing
-# checks the two agree.
-CHUNK_FIELDS = {
-    "explanation": {
-        "return_fields": ["name", "kind", "signatures", "parameter_names", "doc", "explanation"],
-    },
-    "signature": {
-        "return_fields": ["name", "kind", "signatures", "parameter_names", "doc", "explanation"],
-    },
-    "example_workflow": {
-        "return_fields": ["name", "source", "apis_used"],
-    },
-    "example": {
-        "return_fields": ["name", "source", "code"],
-    },
-}
