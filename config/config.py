@@ -13,14 +13,14 @@ from AI_server_config import (  # noqa: F401
     VERIFY_SSL,
 )
 
-parsed_module_name = "pycolmap"
+parsed_module_name = "vela"
 # Stated here rather than read from the installed library, because almost
 # nothing in the pipeline introspects it - the version is what names the
 # dataset, so most steps need the string and not the module. parse_api.py
 # and parse_signatures.py do import it, and check this matches what they
 # found: a mismatch means writing one version's API into another
 # version's file, which nothing downstream could tell had happened.
-parsed_module_version = "4.1.0"
+parsed_module_version = "3.7.0"
 DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 # Not tracked by git, like data/: which parts of a library to index is a
 # local judgement, and the filtering step is optional - absent a file it
@@ -190,7 +190,13 @@ def api_jsonl_path():
 def code_sources():
     """Every directory under src/, each becoming one records file named
     after it. The directory name is also the prefix its records carry, so
-    a hit says where the code came from."""
+    a hit says where the code came from.
+
+    Code and documentation from the same directory are kept in separate
+    files - parse_python_code.py writes "jsonl", parse_markdown.py writes
+    "docs_jsonl" - because one directory can hold both, and each step
+    rewrites its own file whole. Sharing one would mean whichever ran
+    second erased the other's work."""
     root = src_dir()
     if not root.exists():
         return []
@@ -198,6 +204,7 @@ def code_sources():
         {
             "src_dir": directory,
             "jsonl": raw_text_dir() / f"{directory.name}.jsonl",
+            "docs_jsonl": raw_text_dir() / f"{directory.name}_docs.jsonl",
             "name_prefix": directory.name,
         }
         for directory in sorted(root.iterdir())
@@ -283,13 +290,37 @@ CHUNK_FIELDS = {
     },
     "example_workflow": {
         "embedding_fields": ["name", "apis_used"],
-        "required": ["code"],
+        # apis_used as well as code, because it is the whole of what this
+        # chunk matches on: a record without it embeds its name and nothing
+        # else, which matches everything weakly and answers nothing. Code
+        # from documentation is exactly that case - a CLI invocation calls
+        # no API - and it is still reachable through the "example" chunk,
+        # which embeds the code itself.
+        "required": ["code", "apis_used"],
         "return_fields": ["name", "source", "apis_used"],
     },
     "example": {
         "embedding_fields": ["name", "apis_used", "code"],
         "required": ["code"],
         "return_fields": ["name", "source", "code"],
+    },
+    # Prose from the documentation (parse_markdown.py). Required on "doc"
+    # rather than "explanation" because the body already is a written
+    # explanation - one a human wrote about their own software - so asking
+    # an LLM to restate it would only add a way for it to be wrong.
+    # heading_path is embedded because a section title is often meaningless
+    # alone: "Average bandwidth" is a question nobody asks, while
+    # "Vela Performance Estimations > Estimated memory bandwidth >
+    # Average bandwidth" is what they meant.
+    "doc_section": {
+        "embedding_fields": ["name", "heading_path", "doc"],
+        # heading_path as well as doc, and only markdown records carry it.
+        # Recipes match on which fields a record has rather than on what
+        # kind it is, so requiring only doc would take in every API record
+        # with a docstring - duplicating, under a name that misdescribes
+        # them, what the explanation chunk already covers.
+        "required": ["doc", "heading_path"],
+        "return_fields": ["name", "heading_path", "doc", "source"],
     },
 }
 

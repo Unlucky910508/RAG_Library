@@ -33,6 +33,13 @@ def extract_code(record):
     return record.get("code")
 
 
+def extract_heading_path(record):
+    """The chain of headings a documentation section sits under, joined so
+    it reads as the trail it is."""
+    path = record.get("heading_path")
+    return " > ".join(path) if path else None
+
+
 def extract_source(record):
     source = record.get("source")
     return f"source: {source}" if source else None
@@ -78,6 +85,7 @@ FIELD_EXTRACTORS = {
     "explanation": extract_explanation,
     "doc": extract_doc,
     "code": extract_code,
+    "heading_path": extract_heading_path,
     "source": extract_source,
     "license": extract_license,
     "signatures": extract_signatures,

@@ -12,18 +12,20 @@ all generated locally):
 
 ```
 data/pycolmap_4.1.0/
-  src/                    .py files, one directory per source
+  src/                    .py and .md files, one directory per source
     official/             from fetch_official_example_code.py
     community/            from fetch_community_code.py
     <yours>/              anything you put there
-  raw_text/               records, one jsonl per source
+  raw_text/               records, one jsonl per source per kind
     api.jsonl             one record per API
     official.jsonl        official example code, per function
     community.jsonl       third-party code, per function
+    official_docs.jsonl   documentation, per section
   chunked_text/           the same, split into embedding chunks
     api_chunks.jsonl
     official_chunks.jsonl
     community_chunks.jsonl
+    official_docs_chunks.jsonl
   chroma/                 the vector store
   community_candidates.jsonl   what the community fetch kept and refused
 ```
@@ -205,6 +207,41 @@ downloaded sources; the tradeoff is that dynamic references
 lower bound. Python only — other languages would need a sibling
 `parse_<language>_code.py`.
 
+```bash
+python src/parse_library/parse_markdown.py
+```
+Reads `.md` files from the same directories, writing
+`raw_text/<name>_docs.jsonl` — a separate file from the code records
+because one directory can hold both, and each step rewrites its own file
+whole. For a library whose usable surface is a command-line tool rather
+than an importable API, this is the step that has anything to index at
+all.
+
+**One section is one record**: a heading, and the text between it and the
+next heading of any level. So a heading with subsections keeps only its
+own opening prose and its children keep theirs — content lands in exactly
+one record instead of parents repeating everything beneath them. Sections
+holding nothing but subheadings are dropped.
+
+Parent sections are kept rather than skipped because their opening prose
+is usually the most useful text in the file: what the tool is, how to get
+started, what the output means. Only the deepest sections carry detail;
+the shallow ones carry orientation.
+
+Each record stores its **heading path**, which is also embedded, because a
+section title often means nothing alone — "Average bandwidth" is not a
+question anyone asks, while "Vela Performance Estimations > Estimated
+memory bandwidth > Average bandwidth" is what they meant. Fenced code
+blocks are also pulled into `code`, so a section documenting a command is
+retrievable as the runnable thing it shows, and the licence is read from
+the SPDX header and stripped from the body.
+
+Headings inside fenced blocks are ignored — a `# Install dependencies` in
+a shell example would otherwise open a section swallowing the rest of the
+file. The licence header is blanked rather than deleted, keeping the line
+count, so every `source` line number still points at the same line of the
+file on disk.
+
 #### Optional: finding more example code
 
 The official examples are a small corpus. To pull in third-party code that
@@ -273,16 +310,14 @@ python src/rag_ingest/parse_chunks.py
 Splits each record (from **every jsonl in `raw_text/`**) into one or more
 embedding chunks — currently an `explanation` chunk (name + official
 docstring text + generated explanation), a `signature` chunk (name +
-signatures + parameter names), and an `example` chunk (name + APIs used +
-code) — so conceptual, precise/parameter-level, and how-do-I-use-it
+signatures + parameter names), an `example` chunk (name + APIs used +
+code), and a `doc_section` chunk (name + heading path + documentation
+prose) — so conceptual, precise/parameter-level, and how-do-I-use-it
 queries can each match a chunk suited to that style. Each record file gets
 its own paired chunk file, name derived automatically
 (`..._api.jsonl` → `..._api_chunks.jsonl`, `..._examples.jsonl` →
 `..._examples_chunks.jsonl`), so different data sources stay separate and
-a future record source needs no config change. Chunks only carry
-`record_id`/`chunk_type`/`text`; the full record is looked up by
-`record_id` in the record jsonls once a chunk matches, not duplicated
-here.
+a future record source needs no config change.
 
 Which fields compose each chunk_type is a declarative recipe
 (`CHUNK_FIELDS` in `config/config.py`), not code. Each recipe names three
@@ -292,6 +327,15 @@ lists, all drawn from the field vocabulary in
 - `embedding_fields` — concatenated into the text that gets embedded and matched against queries (used here)
 - `required` — fields a record must actually have for this chunk_type to apply at all
 - `return_fields` — concatenated into the text handed back on a hit (used by `search.py`)
+
+Recipes match on **which fields a record has, not what kind of record it
+is** — which is what lets a new record source need no config change, and
+is also the thing to watch when adding one. List in `required` every field
+the chunk genuinely depends on, including the ones that merely make it
+distinctive: a recipe requiring less than it embeds will quietly apply to
+records it was never meant for, and the resulting chunk embeds whatever is
+left — often just the name, which matches every query weakly and answers
+none of them.
 
 Splitting embedding from return means a chunk can be *found* by one kind
 of text and *answered* with another. Recombining existing fields is a
