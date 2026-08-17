@@ -20,7 +20,6 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
 from config import (
     API_KEY,
-    CHROMA_DIR,
     CHROMA_DISTANCE_METRIC,
     CHUNK_FIELDS,
     EMBEDDING_BASE_URL,
@@ -28,6 +27,7 @@ from config import (
     VERIFY_SSL,
     MAX_TOP_K,
     chroma_collection_name,
+    chroma_dir,
     record_jsonl_paths,
 )
 
@@ -58,7 +58,7 @@ def load_records_by_id(version):
 
 
 def get_collection(version):
-    client = chromadb.PersistentClient(path=str(CHROMA_DIR))
+    client = chromadb.PersistentClient(path=str(chroma_dir(version)))
     return client.get_or_create_collection(
         name=chroma_collection_name(version),
         metadata={"hnsw:space": CHROMA_DISTANCE_METRIC},

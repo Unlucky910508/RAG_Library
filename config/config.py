@@ -189,7 +189,17 @@ def chunk_jsonl_paths(version):
     return [chunks_jsonl_path_for(p) for p in record_jsonl_paths(version)]
 
 
-CHROMA_DIR = DATA_DIR / "chroma"
+# A function, not a constant, because the version is only known once the
+# target library has been imported - which cannot happen while this module
+# is still being defined.
+def chroma_dir(version):
+    """One database per library and version. Chroma can hold several
+    collections in one store, but keeping them apart means a rebuild for
+    one library is a directory to delete rather than a collection to find,
+    and no cross-version state can outlive the data it came from."""
+    return DATA_DIR / f"chroma_{parsed_module_name}_{version}"
+
+
 # BAAI/bge-m3 (like most embedding models) is trained/evaluated for cosine
 # similarity, not Chroma's default squared-L2 distance. Only affects a
 # collection at creation time - set here so load_vectordb.py and
@@ -198,6 +208,10 @@ CHROMA_DISTANCE_METRIC = "cosine"
 
 
 def chroma_collection_name(version):
+    """The collection inside that database. Now that the directory is
+    already per-library-and-version this is belt and braces, but naming it
+    the same way costs nothing and keeps a store readable if one is ever
+    pointed at by hand."""
     return f"{parsed_module_name}_{version}"
 
 

@@ -22,12 +22,12 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
 from config import (
     API_KEY,
-    CHROMA_DIR,
     CHROMA_DISTANCE_METRIC,
     EMBEDDING_BASE_URL,
     EMBEDDING_MODEL,
     VERIFY_SSL,
     chroma_collection_name,
+    chroma_dir,
     chunk_jsonl_paths,
     parsed_module_name,
 )
@@ -127,8 +127,10 @@ def load_chunks(collection, chunks, api_key):
 
 
 def main():
+    version = __import__(parsed_module_name).__version__
+
     chunks = []
-    for path in chunk_jsonl_paths(__import__(parsed_module_name).__version__):
+    for path in chunk_jsonl_paths(version):
         if path.exists():
             file_chunks = read_jsonl(path)
             chunks.extend(file_chunks)
@@ -136,9 +138,9 @@ def main():
         else:
             print(f"Skipping {path} (not generated yet)")
 
-    client = chromadb.PersistentClient(path=str(CHROMA_DIR))
+    client = chromadb.PersistentClient(path=str(chroma_dir(version)))
     collection = client.get_or_create_collection(
-        name=chroma_collection_name(__import__(parsed_module_name).__version__),
+        name=chroma_collection_name(version),
         metadata={"hnsw:space": CHROMA_DISTANCE_METRIC},
     )
 
