@@ -6,13 +6,33 @@ per entry) plus official example code, so a local LLM/agent can look up
 API details instead of relying on its own possibly-wrong memory of the
 library.
 
-Output (`data/` is gitignored - everything in it is generated locally):
-- `data/pycolmap_{version}_api.jsonl` — one record per API.
-- `data/pycolmap_{version}_examples_src/` — the downloaded official example `.py` files, plus a `_manifest.json` of where each came from.
-- `data/pycolmap_{version}_community_src/` — optional; third-party `.py` files that passed the filters, namespaced per repository.
-- `data/pycolmap_{version}_examples.jsonl` / `..._community.jsonl` — that code split into per-function records, one file per source.
-- `data/pycolmap_{version}_api_chunks.jsonl` / `..._examples_chunks.jsonl` / `..._community_chunks.jsonl` — that data split into embedding chunks, one chunk file per record file (text only, no vectors).
-- `data/chroma/` — a persistent Chroma DB holding each chunk's text, metadata, and embedding vector.
+Output — everything for one library at one version under a single
+directory, split by what the contents are (`data/` is gitignored; it is
+all generated locally):
+
+```
+data/pycolmap_4.1.0/
+  src/                    .py files, one directory per source
+    official/             from fetch_official_example_code.py
+    community/            from fetch_community_code.py
+    <yours>/              anything you put there
+  raw_text/               records, one jsonl per source
+    api.jsonl             one record per API
+    official.jsonl        official example code, per function
+    community.jsonl       third-party code, per function
+  chunked_text/           the same, split into embedding chunks
+    api_chunks.jsonl
+    official_chunks.jsonl
+    community_chunks.jsonl
+  chroma/                 the vector store
+  community_candidates.jsonl   what the community fetch kept and refused
+```
+
+**The steps between those directories look at what is there rather than
+at a list.** A directory you create under `src/` is parsed, named after
+itself, and carried through chunking and indexing without being
+registered anywhere — so code you gathered some other way only has to be
+put in the right place.
 
 ## 1. Environment setup
 
