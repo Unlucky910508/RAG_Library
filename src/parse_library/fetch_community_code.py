@@ -60,6 +60,7 @@ from config import (
     official_src_dir,
     load_github_token,
     parsed_module_name,
+    parsed_module_version,
 )
 
 if VERIFY_SSL is False:
@@ -140,7 +141,7 @@ def official_source(version):
     which made comparing against them silently match nothing and let the
     official examples through as community finds. The manifest records
     what was really downloaded, so it cannot drift from it."""
-    manifest_path = official_src_dir(version) / EXAMPLES_MANIFEST_NAME
+    manifest_path = official_src_dir() / EXAMPLES_MANIFEST_NAME
     if not manifest_path.exists():
         return None
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
@@ -275,12 +276,12 @@ def evaluate_repo(repo, entry, meta, module_name, known_names, dest_dir, officia
 
 
 def main():
-    version = __import__(parsed_module_name).__version__
-    known_names = {r["name"] for r in read_jsonl(api_jsonl_path(version))}
+    version = parsed_module_version
+    known_names = {r["name"] for r in read_jsonl(api_jsonl_path())}
     token = load_github_token()
     print(f"GitHub API: {'authenticated' if token else 'unauthenticated (60 requests/hour)'}")
 
-    dest_dir = community_src_dir(version)
+    dest_dir = community_src_dir()
     dest_dir.mkdir(parents=True, exist_ok=True)
 
     official = official_source(version)
@@ -316,7 +317,7 @@ def main():
         candidates.extend(found)
 
     candidates.sort(key=lambda c: (not c["recommended"], -c["qualifying_functions"], -c["max_apis_in_function"]))
-    write_jsonl(candidates, community_candidates_path(version))
+    write_jsonl(candidates, community_candidates_path())
 
     kept = [c for c in candidates if c["recommended"]]
     # Same manifest contract as the official fetcher, so parse_python_code
@@ -339,7 +340,7 @@ def main():
     if import_only:
         print(f"  ({import_only} downloaded but never used the library, so not kept)")
     print(f"  licences: {', '.join(licenses) if licenses else 'none'}")
-    print(f"  decisions recorded in {community_candidates_path(version)}")
+    print(f"  decisions recorded in {community_candidates_path()}")
     print("Review the directory and delete anything unwanted, then run parse_python_code.py.")
 
 

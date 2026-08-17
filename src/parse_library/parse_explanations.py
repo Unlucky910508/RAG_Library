@@ -25,7 +25,6 @@ from config import (
     LLM_BASE_URL,
     LLM_MODEL,
     VERIFY_SSL,
-    parsed_module_name,
     record_jsonl_paths,
 )
 
@@ -156,7 +155,7 @@ def enrich_with_explanations(records, api_key, path):
 
 
 def main():
-    for path in record_jsonl_paths(__import__(parsed_module_name).__version__):
+    for path in record_jsonl_paths():
         records = read_jsonl(path)
         enrich_with_explanations(records, API_KEY, path)
         print(f"Done. Wrote explanations to {path}")

@@ -36,6 +36,7 @@ from config import (
     raw_text_dir,
     src_dir,
     parsed_module_name,
+    parsed_module_version,
 )
 
 
@@ -199,14 +200,14 @@ def parse_source_dir(source_dir, module_name, known_names, name_prefix):
 
 
 def main():
-    version = __import__(parsed_module_name).__version__
-    known_names = {r["name"] for r in read_jsonl(api_jsonl_path(version))}
+    version = parsed_module_version
+    known_names = {r["name"] for r in read_jsonl(api_jsonl_path())}
 
-    sources = code_sources(version)
+    sources = code_sources()
     if not sources:
-        print(f"No source directories under {src_dir(version)} - nothing to parse")
+        print(f"No source directories under {src_dir()} - nothing to parse")
         return
-    raw_text_dir(version).mkdir(parents=True, exist_ok=True)
+    raw_text_dir().mkdir(parents=True, exist_ok=True)
 
     for source in sources:
         source_dir = source["src_dir"]

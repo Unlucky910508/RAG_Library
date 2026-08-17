@@ -25,7 +25,6 @@ from config import (
     CHUNK_FIELDS,
     chunked_text_dir,
     chunks_jsonl_path_for,
-    parsed_module_name,
     raw_text_dir,
     record_jsonl_paths,
 )
@@ -76,20 +75,19 @@ def build_chunks(record):
 
 
 def main():
-    version = __import__(parsed_module_name).__version__
 
-    record_paths = record_jsonl_paths(version)
+    record_paths = record_jsonl_paths()
     if not record_paths:
-        print(f"No records under {raw_text_dir(version)} - nothing to chunk")
+        print(f"No records under {raw_text_dir()} - nothing to chunk")
         return
-    chunked_text_dir(version).mkdir(parents=True, exist_ok=True)
+    chunked_text_dir().mkdir(parents=True, exist_ok=True)
 
     for record_path in record_paths:
         records = read_jsonl(record_path)
         chunks = []
         for record in records:
             chunks.extend(build_chunks(record))
-        output_path = chunks_jsonl_path_for(record_path, version)
+        output_path = chunks_jsonl_path_for(record_path)
         write_jsonl(chunks, output_path)
         print(f"Wrote {len(chunks)} chunks from {len(records)} records to {output_path}")
 

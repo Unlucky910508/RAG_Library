@@ -31,7 +31,6 @@ from config import (
     chroma_dir,
     chunk_jsonl_paths,
     chunked_text_dir,
-    parsed_module_name,
 )
 
 if VERIFY_SSL is False:
@@ -136,11 +135,10 @@ def load_chunks(collection, chunks, api_key):
 
 
 def main():
-    version = __import__(parsed_module_name).__version__
 
-    chunk_paths = chunk_jsonl_paths(version)
+    chunk_paths = chunk_jsonl_paths()
     if not chunk_paths:
-        print(f"No chunks under {chunked_text_dir(version)} - run parse_chunks.py first")
+        print(f"No chunks under {chunked_text_dir()} - run parse_chunks.py first")
         return
 
     chunks = []
@@ -149,9 +147,9 @@ def main():
         chunks.extend(file_chunks)
         print(f"Read {len(file_chunks)} chunks from {path.name}")
 
-    client = chromadb.PersistentClient(path=str(chroma_dir(version)))
+    client = chromadb.PersistentClient(path=str(chroma_dir()))
     collection = client.get_or_create_collection(
-        name=chroma_collection_name(version),
+        name=chroma_collection_name(),
         metadata={"hnsw:space": CHROMA_DISTANCE_METRIC},
     )
 

@@ -39,7 +39,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from config import api_filter_path, api_jsonl_path, parsed_module_name
+from config import api_filter_path, api_jsonl_path
 
 
 def read_jsonl(path):
@@ -120,16 +120,15 @@ def parse_args():
 
 def main():
     args = parse_args()
-    version = __import__(parsed_module_name).__version__
 
-    filter_file = args.filter_file or api_filter_path(version, args.mode)
+    filter_file = args.filter_file or api_filter_path(args.mode)
     if not filter_file.exists():
         sys.exit(
             f"No {args.mode} list at {filter_file}.\n"
             f"Create it with one or more lists of name prefixes, or pass --filter-file."
         )
 
-    path = args.path or api_jsonl_path(version)
+    path = args.path or api_jsonl_path()
     if not path.exists():
         sys.exit(f"No records at {path} - run parse_api.py first")
 

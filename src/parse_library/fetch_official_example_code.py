@@ -48,6 +48,7 @@ from config import (
     VERIFY_SSL,
     load_github_token,
     parsed_module_name,
+    parsed_module_version,
 )
 
 if VERIFY_SSL is False:
@@ -258,7 +259,7 @@ def download_examples(source, dest_dir, token):
 
 
 def main():
-    version = __import__(parsed_module_name).__version__
+    version = parsed_module_version
     token = load_github_token()
 
     try:
@@ -273,7 +274,7 @@ def main():
     for field in ("repo", "ref", "path", "license"):
         print(f"  {field:8} {source[field]}  ({origins[field]})")
 
-    dest_dir = official_src_dir(version)
+    dest_dir = official_src_dir()
     files = download_examples(source, dest_dir, token)
     print(f"Downloaded {len(files)} example files to {dest_dir}")
 

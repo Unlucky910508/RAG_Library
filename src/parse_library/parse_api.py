@@ -10,7 +10,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from config import api_jsonl_path, parsed_module_name, raw_text_dir
+from config import api_jsonl_path, parsed_module_name, parsed_module_version, raw_text_dir
 
 
 def is_public(name):
@@ -82,11 +82,30 @@ def write_jsonl(records, output_path):
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
+def check_version(root):
+    """The version in config names the dataset; this is the one step that
+    also holds the library itself, so it is the one place the two can be
+    compared. Left unchecked, introspecting one version while writing it
+    into another version's directory produces a dataset that is wrong in a
+    way nothing downstream could notice - the records look fine, they just
+    describe software nobody asked about."""
+    installed = getattr(root, "__version__", None)
+    if installed is None or installed == parsed_module_version:
+        return
+    sys.exit(
+        f"config says {parsed_module_name} {parsed_module_version}, but the "
+        f"installed one is {installed}.\n"
+        f"Set parsed_module_version = \"{installed}\" in config/config.py, "
+        f"or install {parsed_module_version}."
+    )
+
+
 def main():
     root = __import__(parsed_module_name)
+    check_version(root)
 
-    raw_text_dir(root.__version__).mkdir(parents=True, exist_ok=True)
-    output_file = api_jsonl_path(root.__version__)
+    raw_text_dir().mkdir(parents=True, exist_ok=True)
+    output_file = api_jsonl_path()
 
     records = collect_apis(root, parsed_module_name)
 

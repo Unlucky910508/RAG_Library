@@ -34,9 +34,31 @@ itself, and carried through chunking and indexing without being
 registered anywhere — so code you gathered some other way only has to be
 put in the right place.
 
-## 1. Environment setup
+## 1. Point config at a library
 
-Create a conda env with the target library (pycolmap) installed, e.g.:
+`config/config.py` names what is being indexed:
+
+```python
+parsed_module_name = "pycolmap"
+parsed_module_version = "4.1.0"
+```
+
+Together they name every directory under `data/` and the Chroma
+collection, so retargeting the pipeline is these two lines.
+
+**The version is stated rather than read from the installed library**,
+because only `parse_api.py` and `parse_signatures.py` actually introspect
+it — every other step just needs the string to find its directory. Stating
+it means the fetch, parse, chunk and index steps run without the target
+library installed at all, on a machine that could not install it. Those
+two steps do import it, and check it matches: a mismatch means writing one
+version's API into another version's directory, which nothing downstream
+could tell had happened.
+
+## 2. Environment setup
+
+Only `parse_api.py` and `parse_signatures.py` need the target library.
+Create a conda env with it installed, e.g.:
 
 ```bash
 conda create -n pycolmap python=3.11
@@ -53,7 +75,7 @@ pip install -r requirements.txt
 All commands below assume this env is active (or call its interpreter
 directly, e.g. `/path/to/envs/pycolmap/bin/python`).
 
-## 2. LLM config (only needed for `parse_explanations.py` and `load_vectordb.py`)
+## 3. LLM config (only needed for `parse_explanations.py` and `load_vectordb.py`)
 
 ```bash
 cp config/AI_server_config.template.py config/AI_server_config.py
@@ -76,7 +98,7 @@ pulling a newer version of the pipeline never touches your settings or
 asks you to reconcile them. `config/config.py` re-exports everything from
 it, so scripts import it all from `config` either way.
 
-## 3. Running the pipeline
+## 4. Running the pipeline
 
 Three phases: `src/parse_library/` produces the raw per-API data,
 `src/rag_ingest/` turns that data into what a RAG system actually indexes,
@@ -145,7 +167,7 @@ repository and licence come from the package's PyPI metadata, and the
 directory from scanning the repository tree for a conventionally named one
 (`examples/`, `samples/`, `demos/`, …) holding `.py` files. Tag lookup
 tries both `{version}` and `v{version}`, since projects differ. So
-retargeting the pipeline is still just `parsed_module_name`.
+retargeting the pipeline is still just the two names in config.
 
 `EXAMPLES_GITHUB_REPO`, `EXAMPLES_PATH_IN_REPO` and `EXAMPLES_LICENSE`
 default to `None`, meaning "work it out". Set any of them to decide it by
@@ -325,7 +347,7 @@ instead of silently staying stale. Same retry/incremental-flush design as
 Scripts must be run by file path (`python src/<folder>/<script>.py`), not
 as a module (`-m`) — there is no `__init__.py` under `src/`.
 
-## 4. Refreshing stale explanations
+## 5. Refreshing stale explanations
 
 Explanations are generated from whatever fields a record had at the time,
 so when an enricher starts emitting a new field, explanations written
@@ -353,7 +375,7 @@ every record's output is stale. Afterwards re-run `parse_chunks.py` and
 `load_vectordb.py`; the latter's `text_hash` check re-embeds only the
 chunks whose text actually changed.
 
-## 5. Notes
+## 6. Notes
 
 - Target library name / output path / LLM settings are centralized in
   `config/config.py` so the pipeline steps never drift out of sync.

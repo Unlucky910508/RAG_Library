@@ -15,7 +15,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "config"))
-from config import api_jsonl_path, parsed_module_name
+from config import api_jsonl_path, parsed_module_name, parsed_module_version
 
 OVERLOAD_LINE_RE = re.compile(r"^\d+\.\s+(.+)$")
 IMPLICIT_PARAM_NAMES = {"self", "cls"}
@@ -297,8 +297,28 @@ def write_jsonl(records, path):
             f.write(json.dumps(record, ensure_ascii=False) + "\n")
 
 
+def check_version(root):
+    """The version in config names the dataset; this is the one step that
+    also holds the library itself, so it is the one place the two can be
+    compared. Left unchecked, introspecting one version while writing it
+    into another version's directory produces a dataset that is wrong in a
+    way nothing downstream could notice - the records look fine, they just
+    describe software nobody asked about."""
+    installed = getattr(root, "__version__", None)
+    if installed is None or installed == parsed_module_version:
+        return
+    sys.exit(
+        f"config says {parsed_module_name} {parsed_module_version}, but the "
+        f"installed one is {installed}.\n"
+        f"Set parsed_module_version = \"{installed}\" in config/config.py, "
+        f"or install {parsed_module_version}."
+    )
+
+
 def main():
-    path = api_jsonl_path(__import__(parsed_module_name).__version__)
+    check_version(__import__(parsed_module_name))
+
+    path = api_jsonl_path()
 
     records = read_jsonl(path)
     enrich_records(records)
