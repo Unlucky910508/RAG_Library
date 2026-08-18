@@ -277,6 +277,35 @@ MAX_TOP_K = 5
 # Splitting the two lists means a chunk can be *found* by one kind of text
 # and *answered* with another - e.g. match on a prose explanation but hand
 # back the source code.
+# Longest embedding text a chunk may carry. Over this, a chunk is split
+# into several - all keeping the same record_id and the same full
+# return_text, so the record is found through whichever piece matches and
+# still answered with the whole of it. search.py already collapses
+# multiple chunks of one record into a single hit.
+#
+# The limit is not the model's context window, which nothing here comes
+# near. It is that one vector averages everything it was given: a section
+# listing fifty operators, or a two-hundred-line function, produces a
+# vector sharply about none of them. Splitting is preferred to summarising
+# because the detail is what gets asked about - operator names, config
+# keys, the order of API calls - and a summary short enough to help is
+# short enough to have dropped it.
+#
+# Set to None to store every chunk whole.
+CHUNK_MAX_CHARS = 2000
+# Boundaries a split may fall on, strongest first; the last one is why a
+# split can always be made. Line starts throughout, so no piece ever cuts
+# mid-line.
+CHUNK_SPLIT_PATTERNS = (
+    r"^\s*$",            # blank line - a paragraph or block ended
+    r"^\s*```|^\s*~~~",  # a fenced block opens or closes
+    r"^#{1,6}\s",         # a heading
+    r"^\s*\|",           # a table row
+    r"^\s*[-*+]\s",      # a list item
+    r"^\S",              # an unindented line - a top-level statement
+    r"",                 # any line at all
+)
+
 CHUNK_FIELDS = {
     "explanation": {
         "embedding_fields": ["name", "doc", "explanation"],
@@ -314,6 +343,18 @@ CHUNK_FIELDS = {
     # Average bandwidth" is what they meant.
     "doc_section": {
         "embedding_fields": ["name", "heading_path", "section_text"],
+        # Strips markdown link syntax from the embedded text only, keeping
+        # the link text and dropping the target. In a reference table the
+        # targets are in-document anchors repeated on every row - 80% of
+        # the longest section here, and near-identical strings at that, so
+        # they crowd out the operator names that are the reason anyone
+        # would look. The answer keeps the original markdown, links and
+        # all, since a reader follows them.
+        #
+        # Named per recipe rather than applied everywhere because it is
+        # only safe on markdown: in Python, `handlers[key](arg)` matches
+        # the same pattern and would be gutted.
+        "embedding_cleanup": "markdown",
         # section_text, not doc: a docstring read off a library object and
         # the prose under a heading in a documentation file are different
         # things, and recipes match on which fields a record has rather

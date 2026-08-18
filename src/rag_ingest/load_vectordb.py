@@ -46,7 +46,15 @@ def read_jsonl(path):
 
 
 def chunk_id(chunk):
-    return f"{chunk['record_id']}::{chunk['chunk_type']}"
+    """Unique per stored vector, so a chunk that was split does not
+    overwrite itself piece by piece.
+
+    The part is only appended past the first, which leaves the id of an
+    unsplit chunk exactly what it was - lowering CHUNK_MAX_CHARS re-embeds
+    what it actually divided and nothing else."""
+    part = chunk.get("part") or 0
+    suffix = f"::{part}" if part else ""
+    return f"{chunk['record_id']}::{chunk['chunk_type']}{suffix}"
 
 
 def text_hash(chunk):

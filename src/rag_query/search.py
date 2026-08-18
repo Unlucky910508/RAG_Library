@@ -47,10 +47,17 @@ def _resolve(path):
 if VERIFY_SSL is False:
     requests.packages.urllib3.disable_warnings(requests.packages.urllib3.exceptions.InsecureRequestWarning)
 
-# Chroma dedupes multiple matching chunk_types (e.g. both "explanation"
-# and "signature") down to one hit per record_id, so more raw chunk
+# One record holds several chunks - different chunk_types, and long ones
+# split into pieces - which all collapse to a single hit. So more raw
 # matches than top_k are pulled to still surface top_k distinct records.
+#
+# A guessed multiplier cannot be right for every dataset: one record's
+# chunks can fill the whole fetch, and how many chunks that takes is a
+# property of the data, not of this file. So the multiplier is only where
+# the search starts, and it widens until it has enough or has read
+# everything.
 OVERFETCH_MULTIPLIER = 3
+OVERFETCH_GROWTH = 4
 
 
 def get_collection():
@@ -93,18 +100,12 @@ def embed_query(text, api_key):
     return response.json()["data"][0]["embedding"]
 
 
-def search(query, collection, api_key, top_k=MAX_TOP_K):
-    # Clamped rather than rejected: callers are usually models, and an
-    # over-eager top_k should still get an answer. Enforced here rather
-    # than in the MCP layer so every consumer of this module is covered.
-    top_k = max(1, min(top_k, MAX_TOP_K))
-    query_embedding = embed_query(query, api_key)
-    results = collection.query(
-        query_embeddings=[query_embedding],
-        n_results=top_k * OVERFETCH_MULTIPLIER,
-        include=["metadatas", "distances", "documents"],
-    )
+def collect_hits(results, top_k):
+    """One hit per record, keeping the nearest chunk of it.
 
+    Results come back nearest-first, so the first chunk seen for a record
+    is its best match; later ones are the same record found through
+    another of its chunks and say nothing new."""
     hits = []
     seen_record_ids = set()
     for metadata, distance, document in zip(
@@ -125,3 +126,26 @@ def search(query, collection, api_key, top_k=MAX_TOP_K):
         if len(hits) == top_k:
             break
     return hits
+
+
+def search(query, collection, api_key, top_k=MAX_TOP_K):
+    # Clamped rather than rejected: callers are usually models, and an
+    # over-eager top_k should still get an answer. Enforced here rather
+    # than in the MCP layer so every consumer of this module is covered.
+    top_k = max(1, min(top_k, MAX_TOP_K))
+    query_embedding = embed_query(query, api_key)
+
+    stored = collection.count()
+    fetch = min(top_k * OVERFETCH_MULTIPLIER, stored)
+    while True:
+        results = collection.query(
+            query_embeddings=[query_embedding],
+            n_results=fetch,
+            include=["metadatas", "distances", "documents"],
+        )
+        hits = collect_hits(results, top_k)
+        # Short of top_k only because the fetch was too narrow, never
+        # because the store holds no more.
+        if len(hits) >= top_k or fetch >= stored:
+            return hits
+        fetch = min(fetch * OVERFETCH_GROWTH, stored)

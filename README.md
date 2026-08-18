@@ -355,6 +355,35 @@ Splitting embedding from return means a chunk can be *found* by one kind
 of text and *answered* with another. Recombining existing fields is a
 config edit; only a genuinely new field needs a new renderer.
 
+It is also what makes the next two safe. A recipe may name an
+`embedding_cleanup`, which strips markup from the embedded text alone —
+`markdown` drops link targets and keeps link text, because in a reference
+table the targets are in-document anchors repeated near-identically on
+every row: 80% of the longest section here, crowding out the operator
+names that are the reason to look. The answer keeps its markdown intact.
+Cleanup is named per recipe rather than applied everywhere because it is
+only safe on markdown — in Python, `handlers[key](arg)` matches the same
+pattern and would be gutted.
+
+Embedded text longer than `CHUNK_MAX_CHARS` is then **split into several
+chunks sharing one `record_id` and one full `return_text`** — found
+through whichever piece matches, still answered with the whole record. The
+limit is not the model's context window, which nothing here comes near: it
+is that one vector averages everything it was given, so a section listing
+fifty operators, or a two-hundred-line function, ends up sharply about
+none of them.
+
+Splitting is preferred to summarising because the detail is what gets
+asked about — operator names, config keys, the order of API calls — and a
+summary short enough to help is short enough to have dropped it. Cuts fall
+only on line starts drawn from `CHUNK_SPLIT_PATTERNS`, strongest boundary
+in reach and furthest among equals; a piece too small to mean anything is
+merged back into its neighbour, so no vector is spent on a lone `)`. The
+pieces are checked to reassemble into exactly what was split, so whatever
+chooses the boundaries — these patterns now, something with more judgement
+later — cannot quietly rewrite what it divides. A single line longer than
+the limit is kept whole rather than cut mid-line.
+
 ```bash
 python src/rag_ingest/load_vectordb.py
 ```
@@ -381,13 +410,18 @@ instead of silently staying stale. Same retry/incremental-flush design as
 ### Phase 3 — serving queries (`src/rag_query/`)
 
 - `search.py`: the actual RAG search logic (embed a query via the
-  configured embeddings endpoint, query the Chroma collection, dedupe
-  multiple matching chunk_types down to one hit per record, then render
-  each hit's record through the matched chunk_type's `return_fields`).
-  Each hit is `{record_id, matched_chunk_type, distance, text}`. The
-  returned text is assembled at query time rather than read from the
-  vector DB, so editing a recipe's `return_fields` takes effect on the
-  next query with no re-embedding. `top_k` is clamped to
+  configured embeddings endpoint, query the Chroma collection, dedupe the
+  several chunks of one record down to a single hit, keeping its nearest).
+  Each hit is `{record_id, matched_chunk_type, distance, text}`, the text
+  being the answer stored beside the vector when the store was built — so
+  serving needs the store and nothing else, and editing a `return_fields`
+  recipe means rebuilding rather than taking effect on the next query.
+
+  Because one record can hold many chunks, the fetch **widens until it has
+  `top_k` distinct records or has read the whole store**, rather than
+  trusting a fixed multiplier: how many chunks one record takes is a
+  property of the data, not something this file can know. `top_k` is
+  clamped to
   `MAX_TOP_K` (`config/config.py`, default 5) — every hit carries a full
   record's worth of text, so an unbounded request floods the caller's
   context. Enforced here rather than in the MCP layer so every consumer is
