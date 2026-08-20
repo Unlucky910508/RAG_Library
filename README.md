@@ -60,12 +60,14 @@ could tell had happened.
 ## 2. Environment setup
 
 Only `parse_api.py` and `parse_signatures.py` need the target library.
-Create a conda env with it installed, e.g.:
+**It is not a dependency of this repo** (it's not in `requirements.txt`) —
+install whichever library and version you set in `config/config.py`,
+e.g.:
 
 ```bash
 conda create -n pycolmap python=3.11
 conda activate pycolmap
-pip install pycolmap
+pip install pycolmap==4.1.0
 ```
 
 Then install this repo's own dependencies into the same env:

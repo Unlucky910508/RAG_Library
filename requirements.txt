@@ -1,5 +1,4 @@
 # Building a dataset: introspects the target library, fetches sources,
 # calls the model servers, writes the vector store.
-pycolmap==4.1.0
 requests==2.34.2
 chromadb==1.5.9
