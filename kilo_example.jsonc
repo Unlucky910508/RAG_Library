@@ -1,0 +1,49 @@
+// Example Kilo Code MCP config for this repo's query server
+// (src/rag_query/mcp_server.py), which exposes one tool - search_rag -
+// over an already-built Chroma store.
+//
+// Where this goes: paste the "mcp" block below into
+//   - project-level: kilo.jsonc (repo root) or .kilo/kilo.jsonc, or
+//   - global: ~/.config/kilo/kilo.jsonc
+// merging it with whatever "mcp" entries you already have there.
+//
+// src/rag_query/ is meant to be copied on its own to wherever it will
+// run (see the docstrings in mcp_server.py / mcp_server_config.py) - it
+// reads nothing from the rest of this pipeline. Before pointing Kilo at
+// it:
+//   1. pip install -r src/rag_query/requirements.txt into whatever
+//      interpreter "command" below points at.
+//   2. Edit src/rag_query/mcp_server_config.py: CHROMA_PATH and
+//      COLLECTION_NAME to the store load_vectordb.py built, plus the
+//      embedding server settings a query has to be embedded with.
+{
+  "mcp": {
+    "pycolmap-rag": {
+      "type": "local",
+      // Use the interpreter that has this server's requirements.txt
+      // installed (a venv/conda env), not a bare "python" that may
+      // resolve to something else. Both paths must be absolute - Kilo
+      // does not resolve them relative to this file.
+      "command": [
+        "/path/to/venv/bin/python",
+        "/absolute/path/to/RAG_Library/src/rag_query/mcp_server.py"
+      ],
+      // This server takes its settings from mcp_server_config.py, not
+      // from the environment - left empty here, but this is where an
+      // API key or override would go for a server that reads env vars.
+      "environment": {},
+      "enabled": true,
+      // Raised above Kilo's 10s default: a query embeds the question
+      // remotely and then searches Chroma, which can be slower than a
+      // typical local tool call.
+      "timeout": 30000
+    }
+  }
+
+  // Optional: auto-approve this server's one tool instead of confirming
+  // every call. Permission keys are "{server}_{tool}", matching the
+  // names above.
+  // "permission": {
+  //   "pycolmap-rag_search_rag": "allow"
+  // }
+}

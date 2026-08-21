@@ -131,9 +131,11 @@ The policy names the file — `--exclude` reads
 `filter/<module>_<version>/exclude.py`, `--keep` reads `keep.py` — so
 there is no path to pass. Every list of strings in that file is read and
 merged, so prefixes can be grouped by reason under whatever names read
-best; the variable names are ignored. `filter/` is gitignored — these are
-local judgements — so create the file yourself; the step names the exact
-path if it is missing, and skipping it entirely is fine.
+best; the variable names are ignored. `filter/` is gitignored except for
+`filter/modulename_version/`, which is checked in as a template — copy
+it to `filter/<module>_<version>/` and edit; the rest are local
+judgements, so the step names the exact path if it is missing, and
+skipping it entirely is fine.
 
 Run this here rather than later: a record dropped now costs nothing,
 while one dropped after `parse_explanations.py` throws away an LLM call.

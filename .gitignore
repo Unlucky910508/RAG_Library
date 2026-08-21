@@ -1,7 +1,10 @@
 data/
 # Which parts of a library to index is a local judgement, and the pipeline
 # runs without any filter file - the step just reports there is none.
-filter/
+# filter/modulename_version/ is checked in as a template to copy from -
+# everything else under filter/ is a local judgement, ignored.
+filter/*
+!filter/modulename_version/
 __pycache__/
 KNOWN_ISSUES.md
 config/github_token.txt
